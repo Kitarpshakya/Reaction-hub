@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Prisma (deprecated - using MongoDB)
+/prisma
+*.db
+*.db-journal
+/lib/generated/prisma

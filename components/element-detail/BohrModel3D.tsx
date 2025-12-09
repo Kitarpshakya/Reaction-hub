@@ -1,0 +1,236 @@
+"use client";
+
+import { Suspense, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+import { Element } from "@/lib/types/element";
+import * as THREE from "three";
+
+interface BohrModel3DProps {
+  element: Element;
+}
+
+interface ElectronShellProps {
+  radius: number;
+  electrons: number;
+  shellIndex: number;
+  color: string;
+}
+
+function Electron({ position, color }: { position: [number, number, number]; color: string }) {
+  return (
+    <mesh position={position}>
+      <sphereGeometry args={[0.2, 8, 8]} />
+      <meshStandardMaterial
+        color="#ffffff"
+        emissive="#ffffff"
+        emissiveIntensity={0.7}
+        metalness={0.5}
+      />
+    </mesh>
+  );
+}
+
+function ElectronShell({ radius, electrons, shellIndex, color }: ElectronShellProps) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  // Rotate the shell (optimized - less calculations)
+  useFrame((_state, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * (0.3 + shellIndex * 0.1);
+    }
+  });
+
+  // Calculate electron positions around the shell
+  const electronPositions: [number, number, number][] = [];
+  for (let i = 0; i < electrons; i++) {
+    const angle = (i / electrons) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    electronPositions.push([x, 0, z]);
+  }
+
+  return (
+    <group ref={groupRef}>
+      {/* Orbit ring */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[radius, 0.02, 8, 32]} />
+        <meshStandardMaterial color={color} opacity={0.3} transparent />
+      </mesh>
+
+      {/* Electrons */}
+      {electronPositions.map((pos, index) => (
+        <Electron key={index} position={pos} color={color} />
+      ))}
+    </group>
+  );
+}
+
+function Nucleon({ position, type }: { position: [number, number, number]; type: 'proton' | 'neutron' }) {
+  return (
+    <mesh position={position}>
+      <sphereGeometry args={[0.35, 12, 12]} />
+      <meshStandardMaterial
+        color={type === 'proton' ? '#ff3333' : '#3388ff'}
+        emissive={type === 'proton' ? '#ff0000' : '#0066ff'}
+        emissiveIntensity={0.8}
+        roughness={0.2}
+        metalness={0.8}
+      />
+    </mesh>
+  );
+}
+
+function Nucleus({ protons, neutrons, color }: { protons: number; neutrons: number; color: string }) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame((_state, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * 0.5;
+      groupRef.current.rotation.x += delta * 0.3;
+    }
+  });
+
+  // Calculate positions for protons and neutrons in a packed sphere
+  const nucleonPositions: { position: [number, number, number]; type: 'proton' | 'neutron' }[] = [];
+  const totalNucleons = protons + neutrons;
+  const nucleusRadius = Math.max(1, Math.min(0.8 + totalNucleons * 0.015, 2.5));
+
+  // Special case for single nucleon (Hydrogen)
+  if (totalNucleons === 1) {
+    nucleonPositions.push({
+      position: [0, 0, 0],
+      type: 'proton'
+    });
+  } else {
+    // Fibonacci sphere distribution for nucleons
+    const phi = Math.PI * (3 - Math.sqrt(5)); // Golden angle
+
+    for (let i = 0; i < totalNucleons; i++) {
+      const y = 1 - (i / (totalNucleons - 1)) * 2;
+      const radiusAtY = Math.sqrt(1 - y * y);
+      const theta = phi * i;
+
+      const x = Math.cos(theta) * radiusAtY * nucleusRadius * 0.6;
+      const yPos = y * nucleusRadius * 0.6;
+      const z = Math.sin(theta) * radiusAtY * nucleusRadius * 0.6;
+
+      nucleonPositions.push({
+        position: [x, yPos, z],
+        type: i < protons ? 'proton' : 'neutron'
+      });
+    }
+  }
+
+  return (
+    <group ref={groupRef}>
+      {/* Glow effect */}
+      <mesh>
+        <sphereGeometry args={[nucleusRadius, 16, 16]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={0.2}
+          opacity={0.1}
+          transparent
+        />
+      </mesh>
+
+      {/* Individual nucleons */}
+      {nucleonPositions.map((nucleon, index) => (
+        <Nucleon key={index} position={nucleon.position} type={nucleon.type} />
+      ))}
+    </group>
+  );
+}
+
+function AtomModel({ element }: { element: Element }) {
+  const shellRadii = [3, 4.5, 6, 7.5, 9, 10.5, 12];
+
+  // Calculate neutrons (approximation using atomic mass)
+  const neutrons = Math.round(element.atomicMass - element.atomicNumber);
+
+  return (
+    <>
+      {/* Lighting */}
+      <ambientLight intensity={0.6} />
+      <pointLight position={[15, 15, 15]} intensity={1.2} />
+      <pointLight position={[-10, -10, -10]} intensity={0.6} />
+      <pointLight position={[0, -15, 0]} intensity={0.4} />
+
+      {/* Nucleus */}
+      <Nucleus protons={element.atomicNumber} neutrons={neutrons} color={element.color} />
+
+      {/* Electron Shells */}
+      {element.electronsPerShell.map((electronCount, index) => (
+        <ElectronShell
+          key={index}
+          radius={shellRadii[index]}
+          electrons={electronCount}
+          shellIndex={index}
+          color={element.color}
+        />
+      ))}
+
+      {/* Camera Controls */}
+      <OrbitControls
+        enablePan={false}
+        enableZoom={true}
+        minDistance={10}
+        maxDistance={30}
+        autoRotate
+        autoRotateSpeed={0.5}
+        enableDamping={false}
+        makeDefault
+      />
+    </>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-gray-400 animate-pulse">Loading 3D Model...</div>
+    </div>
+  );
+}
+
+export default function BohrModel3D({ element }: BohrModel3DProps) {
+  const neutrons = Math.round(element.atomicMass - element.atomicNumber);
+
+  return (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-3 md:p-4 h-[400px] md:h-[500px] lg:h-[600px] relative overflow-hidden">
+      <div className="absolute top-3 md:top-4 left-3 md:left-4 z-10 bg-gray-900/90 backdrop-blur-sm px-3 md:px-4 py-2.5 rounded-lg border border-gray-700 shadow-xl">
+        <div className="text-gray-400 text-xs md:text-sm font-medium">3D Bohr Model</div>
+        <div className="text-white font-bold text-base md:text-lg mb-2">{element.name}</div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-2 h-2 rounded-full bg-red-500 shadow-sm shadow-red-500/50"></div>
+            <span className="text-gray-300">{element.atomicNumber} Protons</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></div>
+            <span className="text-gray-300">{neutrons} Neutrons</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-2 h-2 rounded-full bg-white shadow-sm shadow-white/30"></div>
+            <span className="text-gray-300">{element.electronsPerShell.reduce((a, b) => a + b, 0)} Electrons</span>
+          </div>
+        </div>
+      </div>
+
+      <Canvas
+        camera={{ position: [18, 12, 18], fov: 45 }}
+        className="w-full h-full"
+      >
+        <Suspense fallback={<LoadingFallback />}>
+          <AtomModel element={element} />
+        </Suspense>
+      </Canvas>
+
+      <div className="absolute bottom-3 md:bottom-4 right-3 md:right-4 text-gray-500 text-[10px] md:text-xs bg-gray-900/70 px-2 py-1 rounded border border-gray-700/50">
+        Drag to rotate • Scroll to zoom
+      </div>
+    </div>
+  );
+}
