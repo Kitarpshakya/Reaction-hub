@@ -30,6 +30,21 @@ export default function ElementBubble({
     id,
   });
 
+  // Track if we're currently dragging or just finished dragging
+  const wasDraggingRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (isDragging) {
+      wasDraggingRef.current = true;
+    } else if (wasDraggingRef.current) {
+      // Just finished dragging - clear flag after a short delay
+      const timeout = setTimeout(() => {
+        wasDraggingRef.current = false;
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [isDragging]);
+
   // Debug logging for selected elements
   React.useEffect(() => {
     if (isSelected) {
@@ -51,8 +66,10 @@ export default function ElementBubble({
     width: bubbleSize,
     height: bubbleSize,
     transform: "translate(-50%, -50%)",
-    opacity: isDragging ? 0.5 : 1,
-    cursor: isDragging ? "grabbing" : "move",
+    opacity: isDragging ? 0.7 : 1,
+    cursor: isDragging ? "grabbing" : "grab",
+    zIndex: isDragging ? 1000 : 1,
+    transition: isDragging ? "none" : "transform 0.2s ease, box-shadow 0.2s ease",
   };
 
   const categoryColor = getCategoryColor(element.category);
@@ -65,17 +82,40 @@ export default function ElementBubble({
   };
 
   const handleElementClick = (e: React.MouseEvent) => {
+    // Don't trigger click if we're dragging or just finished dragging
+    if (isDragging || wasDraggingRef.current) {
+      console.log("Ignoring click - element was being dragged");
+      return;
+    }
+
+    // Don't trigger if clicking on a button
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+
     e.stopPropagation();
-    console.log("Element clicked (from bubble):", element.symbol, "isDragging:", isDragging);
+    console.log("Element clicked (from bubble):", element.symbol);
     // Always call onSelect - let the parent handle the logic
     onSelect();
+  };
+
+  // Create custom listeners that check for button clicks
+  const customListeners = {
+    ...listeners,
+    onPointerDown: (e: React.PointerEvent) => {
+      // Don't start dragging if clicking on a button
+      if ((e.target as HTMLElement).closest('button')) {
+        return;
+      }
+      listeners?.onPointerDown?.(e as any);
+    },
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-full flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
+      className={`rounded-full flex flex-col items-center justify-center transition-all duration-200 ${
         isSelected
           ? "ring-2 ring-blue-400 shadow-md shadow-blue-400/50 scale-105"
           : isBonded
@@ -83,6 +123,8 @@ export default function ElementBubble({
           : "ring-2 ring-dashed ring-yellow-400 shadow-md hover:scale-105 hover:shadow-lg"
       }`}
       onClick={handleElementClick}
+      {...customListeners}
+      {...attributes}
     >
       <div
         className={`w-full h-full rounded-full flex flex-col items-center justify-center ${
@@ -93,9 +135,8 @@ export default function ElementBubble({
           borderColor: adjustColor(categoryColor, -20),
           borderWidth: "2px",
           borderStyle: isBonded ? "solid" : "dashed",
+          pointerEvents: "none", // Prevent inner div from interfering with drag
         }}
-        {...listeners}
-        {...attributes}
       >
         <div className="text-xl font-bold text-black">
           {element.symbol}
@@ -107,11 +148,21 @@ export default function ElementBubble({
         onClick={handleRemoveClick}
         onMouseDown={(e) => {
           e.stopPropagation();
+          e.preventDefault();
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
         }}
         onTouchStart={(e) => {
           e.stopPropagation();
+          e.preventDefault();
         }}
-        className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600 active:bg-red-700 transition-colors shadow-md z-20 cursor-pointer font-bold text-sm border border-white"
+        className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600 active:bg-red-700 transition-colors shadow-md cursor-pointer font-bold text-sm border border-white"
+        style={{
+          pointerEvents: "auto",
+          zIndex: 9999,
+        }}
         title="Remove element"
         type="button"
       >

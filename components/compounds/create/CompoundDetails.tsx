@@ -135,7 +135,14 @@ export default function CompoundDetails({ compoundId }: CompoundDetailsProps) {
 
       const data = await response.json();
       reset();
-      router.push("/compounds");
+
+      // Redirect to the compound detail page
+      const savedCompoundId = compoundId || data.compound?._id || data.compound?.id;
+      if (savedCompoundId) {
+        router.push(`/compounds/${savedCompoundId}`);
+      } else {
+        router.push("/compounds");
+      }
     } catch (err) {
       console.error("Error saving compound:", err);
       setError(err instanceof Error ? err.message : "Failed to save compound");

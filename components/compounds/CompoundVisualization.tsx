@@ -35,14 +35,40 @@ export default function CompoundVisualization({ elements, bonds = [], allElement
     const width = 800;
     const height = 600;
 
-    // If positions are provided, use them
+    // If positions are provided, use them and center the compound
     if (elements.every((el) => el.position)) {
+      const tempPositions = enrichedElements.map((el, idx) => ({
+        ...el,
+        position: elements[idx].position || { x: 0, y: 0 },
+      }));
+
+      // Calculate bounding box of all elements
+      const positions = tempPositions.map(el => el.position);
+      const minX = Math.min(...positions.map(p => p.x));
+      const maxX = Math.max(...positions.map(p => p.x));
+      const minY = Math.min(...positions.map(p => p.y));
+      const maxY = Math.max(...positions.map(p => p.y));
+
+      // Calculate center of the compound
+      const compoundCenterX = (minX + maxX) / 2;
+      const compoundCenterY = (minY + maxY) / 2;
+
+      // Calculate offset to center the compound in canvas
+      const canvasCenterX = width / 2;
+      const canvasCenterY = height / 2;
+      const offsetX = canvasCenterX - compoundCenterX;
+      const offsetY = canvasCenterY - compoundCenterY;
+
+      // Apply offset to all positions
       return {
         canvasWidth: width,
         canvasHeight: height,
-        positionedElements: enrichedElements.map((el, idx) => ({
+        positionedElements: tempPositions.map((el) => ({
           ...el,
-          position: elements[idx].position || { x: 0, y: 0 },
+          position: {
+            x: el.position.x + offsetX,
+            y: el.position.y + offsetY,
+          },
         })),
       };
     }

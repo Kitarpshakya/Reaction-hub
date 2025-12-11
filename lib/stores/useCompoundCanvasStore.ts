@@ -187,23 +187,11 @@ export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => 
 
   updateGroupPosition: (elementId, delta) => {
     set((state) => {
-      const element = state.canvasElements.find((el) => el.id === elementId);
-      if (!element || !element.groupId) {
-        // No group, just update single element
-        return {
-          canvasElements: state.canvasElements.map((el) =>
-            el.id === elementId && el.position
-              ? { ...el, position: { x: el.position.x + delta.x, y: el.position.y + delta.y } }
-              : el
-          ),
-        };
-      }
-
-      // Move entire group
-      const groupId = element.groupId;
+      // Always update just the single element, not the entire group
+      // This allows elements to be freely repositioned with bonds updating dynamically
       return {
         canvasElements: state.canvasElements.map((el) =>
-          el.groupId === groupId && el.position
+          el.id === elementId && el.position
             ? { ...el, position: { x: el.position.x + delta.x, y: el.position.y + delta.y } }
             : el
         ),
