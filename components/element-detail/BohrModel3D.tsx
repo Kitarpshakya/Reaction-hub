@@ -20,12 +20,13 @@ interface ElectronShellProps {
 function Electron({ position, color }: { position: [number, number, number]; color: string }) {
   return (
     <mesh position={position}>
-      <sphereGeometry args={[0.2, 8, 8]} />
+      <sphereGeometry args={[0.15, 16, 16]} />
       <meshStandardMaterial
-        color="#ffffff"
-        emissive="#ffffff"
-        emissiveIntensity={0.7}
-        metalness={0.5}
+        color="#60A5FA"
+        emissive="#60A5FA"
+        emissiveIntensity={0.5}
+        metalness={0.3}
+        roughness={0.2}
       />
     </mesh>
   );
@@ -34,10 +35,11 @@ function Electron({ position, color }: { position: [number, number, number]; col
 function ElectronShell({ radius, electrons, shellIndex, color }: ElectronShellProps) {
   const groupRef = useRef<THREE.Group>(null);
 
-  // Rotate the shell (optimized - less calculations)
+  // Smooth rotation with varied speeds per shell
   useFrame((_state, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * (0.3 + shellIndex * 0.1);
+      // Each shell rotates at different speed, creating a more organic feel
+      groupRef.current.rotation.y += delta * (0.1 + shellIndex * 0.03);
     }
   });
 
@@ -52,10 +54,16 @@ function ElectronShell({ radius, electrons, shellIndex, color }: ElectronShellPr
 
   return (
     <group ref={groupRef}>
-      {/* Orbit ring */}
+      {/* Orbit ring - thinner and more subtle */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[radius, 0.02, 8, 32]} />
-        <meshStandardMaterial color={color} opacity={0.3} transparent />
+        <torusGeometry args={[radius, 0.015, 8, 64]} />
+        <meshStandardMaterial
+          color="#93C5FD"
+          opacity={0.25}
+          transparent
+          emissive="#60A5FA"
+          emissiveIntensity={0.1}
+        />
       </mesh>
 
       {/* Electrons */}
@@ -69,13 +77,13 @@ function ElectronShell({ radius, electrons, shellIndex, color }: ElectronShellPr
 function Nucleon({ position, type }: { position: [number, number, number]; type: 'proton' | 'neutron' }) {
   return (
     <mesh position={position}>
-      <sphereGeometry args={[0.35, 12, 12]} />
+      <sphereGeometry args={[0.35, 16, 16]} />
       <meshStandardMaterial
-        color={type === 'proton' ? '#ff3333' : '#3388ff'}
-        emissive={type === 'proton' ? '#ff0000' : '#0066ff'}
-        emissiveIntensity={0.8}
-        roughness={0.2}
-        metalness={0.8}
+        color={type === 'proton' ? '#F87171' : '#A78BFA'}
+        emissive={type === 'proton' ? '#F87171' : '#A78BFA'}
+        emissiveIntensity={0.4}
+        roughness={0.3}
+        metalness={0.6}
       />
     </mesh>
   );
@@ -84,10 +92,11 @@ function Nucleon({ position, type }: { position: [number, number, number]; type:
 function Nucleus({ protons, neutrons, color }: { protons: number; neutrons: number; color: string }) {
   const groupRef = useRef<THREE.Group>(null);
 
+  // Smooth, gentle rotation
   useFrame((_state, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.5;
-      groupRef.current.rotation.x += delta * 0.3;
+      groupRef.current.rotation.y += delta * 0.15;
+      groupRef.current.rotation.x += delta * 0.1;
     }
   });
 
@@ -124,14 +133,14 @@ function Nucleus({ protons, neutrons, color }: { protons: number; neutrons: numb
 
   return (
     <group ref={groupRef}>
-      {/* Glow effect */}
+      {/* Soft glow effect */}
       <mesh>
-        <sphereGeometry args={[nucleusRadius, 16, 16]} />
+        <sphereGeometry args={[nucleusRadius, 32, 32]} />
         <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={0.2}
-          opacity={0.1}
+          color="#C4B5FD"
+          emissive="#A78BFA"
+          emissiveIntensity={0.3}
+          opacity={0.15}
           transparent
         />
       </mesh>
@@ -152,11 +161,11 @@ function AtomModel({ element }: { element: Element }) {
 
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.6} />
-      <pointLight position={[15, 15, 15]} intensity={1.2} />
-      <pointLight position={[-10, -10, -10]} intensity={0.6} />
-      <pointLight position={[0, -15, 0]} intensity={0.4} />
+      {/* Softer, more ambient lighting */}
+      <ambientLight intensity={0.8} />
+      <pointLight position={[15, 15, 15]} intensity={0.8} color="#ffffff" />
+      <pointLight position={[-10, -10, -10]} intensity={0.4} color="#93C5FD" />
+      <pointLight position={[0, -15, 0]} intensity={0.3} color="#A78BFA" />
 
       {/* Nucleus */}
       <Nucleus protons={element.atomicNumber} neutrons={neutrons} color={element.color} />
@@ -179,8 +188,10 @@ function AtomModel({ element }: { element: Element }) {
         minDistance={10}
         maxDistance={30}
         autoRotate
-        autoRotateSpeed={0.5}
-        enableDamping={false}
+        autoRotateSpeed={0.25}
+        enableDamping={true}
+        dampingFactor={0.05}
+        rotateSpeed={0.5}
         makeDefault
       />
     </>
