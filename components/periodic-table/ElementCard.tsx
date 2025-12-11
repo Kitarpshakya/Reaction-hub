@@ -2,25 +2,44 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ElementCard as IElementCard } from "@/lib/types/element";
+import { ElementCard as IElementCard, ElementCategory } from "@/lib/types/element";
 import { useState, memo } from "react";
 
 interface ElementCardProps {
   element: IElementCard;
   index: number;
+  selectedCategory: ElementCategory | null;
 }
 
-function ElementCard({ element, index }: ElementCardProps) {
+function ElementCard({ element, index, selectedCategory }: ElementCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+
+  // Determine if this element should be dimmed
+  // Check both primary category and categories array for highlighting
+  const matchesCategory =
+    selectedCategory !== null &&
+    (element.category === selectedCategory || element.categories?.includes(selectedCategory));
+  const isFiltered = selectedCategory !== null && !matchesCategory;
+  const isHighlighted = matchesCategory;
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{
+        opacity: isFiltered ? 0.25 : 1,
+        scale: isHighlighted ? 1.05 : 1,
+      }}
       transition={{
-        duration: 0.2,
-        delay: Math.min(index * 0.005, 0.5), // Cap delay at 0.5s
-        ease: "easeOut",
+        opacity: {
+          duration: 0.4,
+          delay: Math.min(index * 0.005, 0.5),
+          ease: "easeInOut",
+        },
+        scale: {
+          duration: 0.4,
+          delay: Math.min(index * 0.005, 0.5),
+          ease: "easeInOut",
+        },
       }}
       style={{
         gridRow: element.gridRow,
@@ -28,11 +47,7 @@ function ElementCard({ element, index }: ElementCardProps) {
       }}
       className="element-card-container aspect-square relative"
     >
-      <Link
-        href={`/elements/${element.symbol}`}
-        className="block h-full w-full"
-        prefetch={false}
-      >
+      <Link href={`/elements/${element.symbol}`} className="block h-full w-full" prefetch={false}>
         <div
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
@@ -40,12 +55,14 @@ function ElementCard({ element, index }: ElementCardProps) {
           style={{
             backgroundColor: element.color,
             backgroundImage: `linear-gradient(135deg, ${element.color} 0%, ${element.color}dd 100%)`,
-            borderColor: isHovered ? element.color : 'rgb(55, 65, 81)',
-            transform: isHovered ? 'scale(1.05)' : 'scale(1)',
-            zIndex: isHovered ? 100 : 1,
-            boxShadow: isHovered
+            borderColor: isHighlighted ? "#6C5CE7" : isHovered ? element.color : "rgb(55, 65, 81)",
+            transform: isHovered ? "scale(1.05)" : "scale(1)",
+            zIndex: isHovered ? 100 : isHighlighted ? 10 : 1,
+            boxShadow: isHighlighted
+              ? `0 0 20px ${element.color}90, 0 0 40px ${element.color}50`
+              : isHovered
               ? `0 8px 16px -4px ${element.color}70`
-              : '0 2px 4px rgba(0, 0, 0, 0.3)',
+              : "0 2px 4px rgba(0, 0, 0, 0.3)",
           }}
         >
           {/* Default View - Symbol and Atomic Number Only */}
@@ -66,7 +83,7 @@ function ElementCard({ element, index }: ElementCardProps) {
 
           {/* Hover View - Full Information */}
           <div
-            className="absolute inset-0 flex flex-col items-center justify-between p-1.5 transition-opacity duration-150"
+            className="absolute inset-0 flex flex-col items-center justify-between p-0.5 transition-opacity duration-150"
             style={{ opacity: isHovered ? 1 : 0 }}
           >
             {/* Atomic Number */}
@@ -76,9 +93,7 @@ function ElementCard({ element, index }: ElementCardProps) {
 
             {/* Symbol - Reduced Size */}
             <div className="flex items-center justify-center flex-shrink-0">
-              <div className="text-base font-bold text-gray-900 leading-none">
-                {element.symbol}
-              </div>
+              <div className="text-base font-bold text-gray-900 leading-none">{element.symbol}</div>
             </div>
 
             {/* Name and Atomic Weight */}

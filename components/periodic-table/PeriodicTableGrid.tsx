@@ -1,14 +1,16 @@
 "use client";
 
-import { ElementCard as IElementCard } from "@/lib/types/element";
+import { ElementCard as IElementCard, ElementCategory } from "@/lib/types/element";
 import ElementCard from "./ElementCard";
 
 interface PeriodicTableGridProps {
   elements: IElementCard[];
+  selectedCategory: ElementCategory | null;
 }
 
 export default function PeriodicTableGrid({
   elements,
+  selectedCategory,
 }: PeriodicTableGridProps) {
   return (
     <div className="w-full flex justify-center py-8 px-4 md:px-6 lg:px-8 xl:px-12 2xl:px-16">
@@ -23,7 +25,12 @@ export default function PeriodicTableGrid({
         }}
       >
         {elements.map((element, index) => (
-          <ElementCard key={element.symbol} element={element} index={index} />
+          <ElementCard
+            key={element.symbol}
+            element={element}
+            index={index}
+            selectedCategory={selectedCategory}
+          />
         ))}
       </div>
     </div>

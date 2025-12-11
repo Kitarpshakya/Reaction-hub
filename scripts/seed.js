@@ -35,6 +35,7 @@ const ElementSchema = new mongoose.Schema(
     name: { type: String, required: true },
     atomicMass: { type: Number, required: true },
     category: { type: String, required: true },
+    categories: { type: [String], default: undefined },
     group: { type: Number, default: null },
     period: { type: Number, required: true },
     block: { type: String, required: true },

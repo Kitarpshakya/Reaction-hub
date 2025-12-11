@@ -9,7 +9,7 @@ export async function GET() {
 
     const elements = await ElementModel.find({})
       .select(
-        "atomicNumber symbol name atomicMass category color gridRow gridColumn"
+        "atomicNumber symbol name atomicMass category categories color gridRow gridColumn"
       )
       .sort({ atomicNumber: 1 })
       .lean();

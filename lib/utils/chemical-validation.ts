@@ -1,5 +1,6 @@
 import { Element } from "@/lib/types/element";
 import { Bond, BondType } from "@/lib/types/compound";
+import { isMetal, isNonmetal } from "./chemistry-helpers";
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -21,95 +22,61 @@ export interface ValidationResult {
   };
 }
 
-interface ElementInfo {
-  element: Element;
-  count: number;
-  oxidationState?: number;
-  charge?: number;
-}
-
-// ============================================================================
-// OXIDATION STATE DATA
-// ============================================================================
-
-const OXIDATION_STATES: Record<string, number[]> = {
-  // Group 1: Always +1
-  H: [1, -1], // H is +1 except in metal hydrides where it's -1
-  Li: [1], Na: [1], K: [1], Rb: [1], Cs: [1], Fr: [1],
-
-  // Group 2: Always +2
-  Be: [2], Mg: [2], Ca: [2], Sr: [2], Ba: [2], Ra: [2],
-
-  // Group 13
-  B: [3], Al: [3], Ga: [3, 1], In: [3, 1], Tl: [3, 1],
-
-  // Group 14
-  C: [4, 2, -4], Si: [4, -4], Ge: [4, 2], Sn: [4, 2], Pb: [4, 2],
-
-  // Group 15
-  N: [5, 4, 3, 2, 1, -3], P: [5, 3, -3], As: [5, 3, -3], Sb: [5, 3, -3], Bi: [5, 3],
-
-  // Group 16
-  O: [-2, -1, 2], // O is -2 except in peroxides (-1) and OF₂ (+2)
-  S: [6, 4, 2, -2], Se: [6, 4, 2, -2], Te: [6, 4, 2, -2], Po: [6, 4, 2],
-
-  // Group 17: Halogens
-  F: [-1], // F is always -1
-  Cl: [7, 5, 3, 1, -1], Br: [7, 5, 3, 1, -1], I: [7, 5, 3, 1, -1], At: [7, 5, 3, 1, -1],
-
-  // Group 18: Noble gases
-  He: [0], Ne: [0], Ar: [0], Kr: [2, 4], Xe: [2, 4, 6, 8], Rn: [2, 4, 6],
-
-  // Transition metals (common oxidation states)
-  Sc: [3], Ti: [4, 3, 2], V: [5, 4, 3, 2], Cr: [6, 3, 2], Mn: [7, 4, 3, 2],
-  Fe: [3, 2], Co: [3, 2], Ni: [2, 3], Cu: [2, 1], Zn: [2],
-  Y: [3], Zr: [4], Nb: [5, 3], Mo: [6, 4, 3], Tc: [7, 4],
-  Ru: [4, 3, 2], Rh: [3, 2, 1], Pd: [4, 2], Ag: [1], Cd: [2],
-  La: [3], Hf: [4], Ta: [5], W: [6, 4, 2], Re: [7, 6, 4],
-  Os: [8, 6, 4], Ir: [4, 3, 2], Pt: [4, 2], Au: [3, 1], Hg: [2, 1],
-};
-
-// Common oxidation states (most likely)
-const COMMON_OXIDATION_STATES: Record<string, number> = {
-  H: 1, Li: 1, Na: 1, K: 1, Rb: 1, Cs: 1,
-  Be: 2, Mg: 2, Ca: 2, Sr: 2, Ba: 2,
-  B: 3, Al: 3,
-  C: 4, Si: 4,
-  N: -3, P: -3,
-  O: -2, S: -2,
-  F: -1, Cl: -1, Br: -1, I: -1,
-  Fe: 2, Cu: 2, Zn: 2, Ag: 1,
-};
-
-// ============================================================================
-// POLYATOMIC IONS
-// ============================================================================
-
 interface PolyatomicIon {
   formula: string;
   name: string;
   charge: number;
-  composition: Record<string, number>;
+  atoms: Record<string, number>;
 }
 
+// ============================================================================
+// POLYATOMIC ION DATABASE
+// ============================================================================
+
 const POLYATOMIC_IONS: PolyatomicIon[] = [
-  { formula: "OH", name: "hydroxide", charge: -1, composition: { O: 1, H: 1 } },
-  { formula: "NO₃", name: "nitrate", charge: -1, composition: { N: 1, O: 3 } },
-  { formula: "NO₂", name: "nitrite", charge: -1, composition: { N: 1, O: 2 } },
-  { formula: "SO₄", name: "sulfate", charge: -2, composition: { S: 1, O: 4 } },
-  { formula: "SO₃", name: "sulfite", charge: -2, composition: { S: 1, O: 3 } },
-  { formula: "PO₄", name: "phosphate", charge: -3, composition: { P: 1, O: 4 } },
-  { formula: "CO₃", name: "carbonate", charge: -2, composition: { C: 1, O: 3 } },
-  { formula: "HCO₃", name: "bicarbonate", charge: -1, composition: { H: 1, C: 1, O: 3 } },
-  { formula: "ClO₄", name: "perchlorate", charge: -1, composition: { Cl: 1, O: 4 } },
-  { formula: "ClO₃", name: "chlorate", charge: -1, composition: { Cl: 1, O: 3 } },
-  { formula: "ClO₂", name: "chlorite", charge: -1, composition: { Cl: 1, O: 2 } },
-  { formula: "ClO", name: "hypochlorite", charge: -1, composition: { Cl: 1, O: 1 } },
-  { formula: "MnO₄", name: "permanganate", charge: -1, composition: { Mn: 1, O: 4 } },
-  { formula: "Cr₂O₇", name: "dichromate", charge: -2, composition: { Cr: 2, O: 7 } },
-  { formula: "CrO₄", name: "chromate", charge: -2, composition: { Cr: 1, O: 4 } },
-  { formula: "NH₄", name: "ammonium", charge: 1, composition: { N: 1, H: 4 } },
+  { formula: "NH4", name: "ammonium", charge: 1, atoms: { N: 1, H: 4 } },
+  { formula: "OH", name: "hydroxide", charge: -1, atoms: { O: 1, H: 1 } },
+  { formula: "CN", name: "cyanide", charge: -1, atoms: { C: 1, N: 1 } },
+  { formula: "NO3", name: "nitrate", charge: -1, atoms: { N: 1, O: 3 } },
+  { formula: "NO2", name: "nitrite", charge: -1, atoms: { N: 1, O: 2 } },
+  { formula: "SO4", name: "sulfate", charge: -2, atoms: { S: 1, O: 4 } },
+  { formula: "SO3", name: "sulfite", charge: -2, atoms: { S: 1, O: 3 } },
+  { formula: "PO4", name: "phosphate", charge: -3, atoms: { P: 1, O: 4 } },
+  { formula: "PO3", name: "phosphite", charge: -3, atoms: { P: 1, O: 3 } },
+  { formula: "CO3", name: "carbonate", charge: -2, atoms: { C: 1, O: 3 } },
+  { formula: "HCO3", name: "bicarbonate", charge: -1, atoms: { H: 1, C: 1, O: 3 } },
+  { formula: "ClO4", name: "perchlorate", charge: -1, atoms: { Cl: 1, O: 4 } },
+  { formula: "ClO3", name: "chlorate", charge: -1, atoms: { Cl: 1, O: 3 } },
+  { formula: "ClO2", name: "chlorite", charge: -1, atoms: { Cl: 1, O: 2 } },
+  { formula: "ClO", name: "hypochlorite", charge: -1, atoms: { Cl: 1, O: 1 } },
+  { formula: "MnO4", name: "permanganate", charge: -1, atoms: { Mn: 1, O: 4 } },
+  { formula: "Cr2O7", name: "dichromate", charge: -2, atoms: { Cr: 2, O: 7 } },
+  { formula: "CrO4", name: "chromate", charge: -2, atoms: { Cr: 1, O: 4 } },
+  { formula: "SCN", name: "thiocyanate", charge: -1, atoms: { S: 1, C: 1, N: 1 } },
 ];
+
+// ============================================================================
+// OXIDATION STATES
+// ============================================================================
+
+const OXIDATION_STATES: Record<string, number> = {
+  // Group 1: +1
+  H: 1, Li: 1, Na: 1, K: 1, Rb: 1, Cs: 1,
+  // Group 2: +2
+  Be: 2, Mg: 2, Ca: 2, Sr: 2, Ba: 2,
+  // Group 13: +3
+  B: 3, Al: 3,
+  // Group 14: +2/+4
+  Sn: 2, Pb: 2,
+  // Group 15: -3
+  N: -3, P: -3,
+  // Group 16: -2
+  O: -2, S: -2,
+  // Group 17: -1
+  F: -1, Cl: -1, Br: -1, I: -1,
+  // Transition metals
+  Fe: 3, Cu: 2, Zn: 2, Ag: 1,
+};
 
 // ============================================================================
 // DIATOMIC MOLECULES
@@ -129,138 +96,248 @@ const DIATOMIC_MOLECULES: Record<string, { bondType: BondType; name: string }> =
 // HELPER FUNCTIONS
 // ============================================================================
 
-function isMetal(element: Element): boolean {
-  const metalCategories = [
-    "alkali-metal",
-    "alkaline-earth-metal",
-    "transition-metal",
-    "post-transition-metal",
-    "lanthanide",
-    "actinide",
-  ];
-  return metalCategories.includes(element.category);
+function subscript(num: number): string {
+  return num.toString().split("").map(d => "₀₁₂₃₄₅₆₇₈₉"[parseInt(d)]).join("");
 }
 
-function isNonmetal(element: Element): boolean {
-  return element.category === "nonmetal" || element.category === "halogen";
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+function lcm(a: number, b: number): number {
+  return Math.abs(a * b) / gcd(a, b);
 }
 
 function isNobleGas(element: Element): boolean {
   return element.category === "noble-gas";
 }
 
-function getElectronegativity(element: Element): number {
-  return element.electronegativity || 0;
+// ============================================================================
+// POLYATOMIC ION DETECTION
+// ============================================================================
+
+interface DetectedIon {
+  ion: PolyatomicIon;
+  elementIds: string[];
 }
 
-// ============================================================================
-// OXIDATION STATE CALCULATION
-// ============================================================================
+function detectPolyatomicIons(
+  bondedElements: Array<{ id: string; element: Element; symbol: string }>,
+  bonds: Bond[]
+): DetectedIon[] {
+  const detected: DetectedIon[] = [];
+  const used = new Set<string>();
 
-function determineOxidationState(
-  element: Element,
-  partners: Element[],
-  bondTypes: BondType[]
-): number {
-  const symbol = element.symbol;
+  // Build adjacency graph
+  const graph = new Map<string, Set<string>>();
+  bonds.forEach(bond => {
+    if (!graph.has(bond.fromElementId)) graph.set(bond.fromElementId, new Set());
+    if (!graph.has(bond.toElementId)) graph.set(bond.toElementId, new Set());
+    graph.get(bond.fromElementId)!.add(bond.toElementId);
+    graph.get(bond.toElementId)!.add(bond.fromElementId);
+  });
 
-  // Fixed oxidation states
-  if (["Li", "Na", "K", "Rb", "Cs", "Fr"].includes(symbol)) return 1;
-  if (["Be", "Mg", "Ca", "Sr", "Ba", "Ra"].includes(symbol)) return 2;
-  if (symbol === "F") return -1;
-  if (symbol === "Al") return 3;
+  // Find connected components
+  function getComponent(startId: string): string[] {
+    const component: string[] = [];
+    const queue = [startId];
+    const visited = new Set<string>();
 
-  // Oxygen is usually -2
-  if (symbol === "O") {
-    // Check for peroxides (O-O bond)
-    const hasOxygenPartner = partners.some(p => p.symbol === "O");
-    return hasOxygenPartner ? -1 : -2;
-  }
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (visited.has(id) || used.has(id)) continue;
+      visited.add(id);
+      component.push(id);
 
-  // Hydrogen is usually +1, except in metal hydrides
-  if (symbol === "H") {
-    const hasMetal = partners.some(p => isMetal(p));
-    return hasMetal ? -1 : 1;
-  }
-
-  // Halogens in binary compounds (except with O or other halogens)
-  if (["Cl", "Br", "I"].includes(symbol)) {
-    const hasOxygenOrHalogen = partners.some(
-      p => p.symbol === "O" || ["F", "Cl", "Br", "I"].includes(p.symbol)
-    );
-    return hasOxygenOrHalogen ? (COMMON_OXIDATION_STATES[symbol] || 1) : -1;
-  }
-
-  // Use common oxidation state or first available
-  return COMMON_OXIDATION_STATES[symbol] || OXIDATION_STATES[symbol]?.[0] || 0;
-}
-
-// ============================================================================
-// FORMULA GENERATION (HILL SYSTEM)
-// ============================================================================
-
-/**
- * Generates chemical formula following the Hill system:
- * - If contains C: C first, then H, then alphabetical
- * - Otherwise: alphabetical order
- * - For ionic compounds: cation first, then anion
- */
-function generateFormula(
-  elementCounts: Record<string, number>,
-  isIonic: boolean,
-  cations: string[],
-  anions: string[]
-): string {
-  let formula = "";
-
-  if (isIonic) {
-    // Ionic: Cations first, then anions
-    const cationFormula = cations
-      .sort()
-      .map(symbol => {
-        const count = elementCounts[symbol];
-        return symbol + (count > 1 ? subscriptNumber(count) : "");
-      })
-      .join("");
-
-    const anionFormula = anions
-      .sort()
-      .map(symbol => {
-        const count = elementCounts[symbol];
-        return symbol + (count > 1 ? subscriptNumber(count) : "");
-      })
-      .join("");
-
-    formula = cationFormula + anionFormula;
-  } else {
-    // Covalent: Hill system
-    const symbols = Object.keys(elementCounts).sort();
-    const hasCarbon = symbols.includes("C");
-
-    if (hasCarbon) {
-      // C first, then H, then rest alphabetically
-      formula += "C" + (elementCounts["C"] > 1 ? subscriptNumber(elementCounts["C"]) : "");
-      if (symbols.includes("H")) {
-        formula += "H" + (elementCounts["H"] > 1 ? subscriptNumber(elementCounts["H"]) : "");
-      }
-      symbols
-        .filter(s => s !== "C" && s !== "H")
-        .forEach(symbol => {
-          formula += symbol + (elementCounts[symbol] > 1 ? subscriptNumber(elementCounts[symbol]) : "");
-        });
-    } else {
-      // Alphabetical
-      symbols.forEach(symbol => {
-        formula += symbol + (elementCounts[symbol] > 1 ? subscriptNumber(elementCounts[symbol]) : "");
+      const neighbors = graph.get(id) || new Set();
+      neighbors.forEach(nId => {
+        if (!visited.has(nId) && !used.has(nId)) {
+          queue.push(nId);
+        }
       });
+    }
+
+    return component;
+  }
+
+  // Try to match each polyatomic ion
+  for (const element of bondedElements) {
+    if (used.has(element.id)) continue;
+
+    const component = getComponent(element.id);
+    if (component.length === 0) continue;
+
+    // Count atoms in this component
+    const atomCounts: Record<string, number> = {};
+    component.forEach(id => {
+      const el = bondedElements.find(e => e.id === id);
+      if (el) {
+        atomCounts[el.symbol] = (atomCounts[el.symbol] || 0) + 1;
+      }
+    });
+
+    // Try to match against known polyatomic ions
+    for (const ion of POLYATOMIC_IONS) {
+      const ionKeys = Object.keys(ion.atoms).sort();
+      const compKeys = Object.keys(atomCounts).sort();
+
+      if (ionKeys.length !== compKeys.length) continue;
+      if (!ionKeys.every((k, i) => k === compKeys[i])) continue;
+      if (!ionKeys.every(k => ion.atoms[k] === atomCounts[k])) continue;
+
+      // Match found!
+      detected.push({ ion, elementIds: component });
+      component.forEach(id => used.add(id));
+      break;
     }
   }
 
-  return formula;
+  return detected;
 }
 
-function subscriptNumber(num: number): string {
-  return num.toString().split("").map(d => "₀₁₂₃₄₅₆₇₈₉"[parseInt(d)]).join("");
+// ============================================================================
+// IONIC COMPOUND FORMULA GENERATION
+// ============================================================================
+
+function generateIonicFormula(
+  bondedElements: Array<{ id: string; element: Element; symbol: string }>,
+  detectedIons: DetectedIon[]
+): { formula: string; isBalanced: boolean; explanation: string } {
+  const usedIds = new Set(detectedIons.flatMap(d => d.elementIds));
+
+  // Separate ions by charge
+  const cationIons = detectedIons.filter(d => d.ion.charge > 0);
+  const anionIons = detectedIons.filter(d => d.ion.charge < 0);
+
+  // Get simple cations (not in polyatomic ions)
+  const simpleCations: Array<{ symbol: string; charge: number; count: number }> = [];
+  const simpleAnions: Array<{ symbol: string; charge: number; count: number }> = [];
+
+  bondedElements.forEach(el => {
+    if (usedIds.has(el.id)) return;
+
+    const charge = OXIDATION_STATES[el.symbol] || 0;
+    if (charge > 0) {
+      const existing = simpleCations.find(c => c.symbol === el.symbol);
+      if (existing) {
+        existing.count++;
+      } else {
+        simpleCations.push({ symbol: el.symbol, charge, count: 1 });
+      }
+    } else if (charge < 0) {
+      const existing = simpleAnions.find(a => a.symbol === el.symbol);
+      if (existing) {
+        existing.count++;
+      } else {
+        simpleAnions.push({ symbol: el.symbol, charge: Math.abs(charge), count: 1 });
+      }
+    }
+  });
+
+  // Determine cation and anion
+  let cationCharge: number;
+  let anionCharge: number;
+  let cationFormula: string;
+  let anionFormula: string;
+  let cationCount: number;
+  let anionCount: number;
+
+  // Get cation info
+  if (cationIons.length > 0) {
+    const cation = cationIons[0];
+    cationCharge = cation.ion.charge;
+    cationFormula = cation.ion.formula;
+    cationCount = 1;
+  } else if (simpleCations.length > 0) {
+    const cation = simpleCations[0];
+    cationCharge = cation.charge;
+    cationFormula = cation.symbol;
+    cationCount = cation.count;
+  } else {
+    return { formula: "", isBalanced: false, explanation: "No cation found" };
+  }
+
+  // Get anion info
+  if (anionIons.length > 0) {
+    const anion = anionIons[0];
+    anionCharge = Math.abs(anion.ion.charge);
+    anionFormula = anion.ion.formula;
+    anionCount = anionIons.length;
+  } else if (simpleAnions.length > 0) {
+    const anion = simpleAnions[0];
+    anionCharge = anion.charge;
+    anionFormula = anion.symbol;
+    anionCount = anion.count;
+  } else {
+    return { formula: "", isBalanced: false, explanation: "No anion found" };
+  }
+
+  // Calculate correct ratio using LCM
+  const commonMultiple = lcm(cationCharge, anionCharge);
+  const correctCationCount = commonMultiple / cationCharge;
+  const correctAnionCount = commonMultiple / anionCharge;
+
+  // Check if current counts match correct ratio
+  const isBalanced = cationCount === correctCationCount && anionCount === correctAnionCount;
+
+  // Build formula: cation first, then anion
+  let formula = "";
+
+  // Add cation
+  const isPolyatomicCation = cationIons.length > 0;
+  if (isPolyatomicCation && correctCationCount > 1) {
+    formula += `(${cationFormula})${subscript(correctCationCount)}`;
+  } else if (correctCationCount > 1) {
+    formula += `${cationFormula}${subscript(correctCationCount)}`;
+  } else {
+    formula += cationFormula;
+  }
+
+  // Add anion
+  const isPolyatomicAnion = anionIons.length > 0;
+  if (isPolyatomicAnion && correctAnionCount > 1) {
+    formula += `(${anionFormula})${subscript(correctAnionCount)}`;
+  } else if (correctAnionCount > 1) {
+    formula += `${anionFormula}${subscript(correctAnionCount)}`;
+  } else {
+    formula += anionFormula;
+  }
+
+  const explanation = isBalanced
+    ? "Charges balanced"
+    : `Need ${correctCationCount} ${cationFormula} and ${correctAnionCount} ${anionFormula} for charge balance`;
+
+  return { formula, isBalanced, explanation };
+}
+
+// ============================================================================
+// COVALENT COMPOUND FORMULA GENERATION
+// ============================================================================
+
+function generateCovalentFormula(elementCounts: Record<string, number>): string {
+  let formula = "";
+  const symbols = Object.keys(elementCounts).sort();
+  const hasCarbon = symbols.includes("C");
+
+  if (hasCarbon) {
+    // Hill system: C first, then H, then rest alphabetically
+    formula += "C" + (elementCounts["C"] > 1 ? subscript(elementCounts["C"]) : "");
+    if (symbols.includes("H")) {
+      formula += "H" + (elementCounts["H"] > 1 ? subscript(elementCounts["H"]) : "");
+    }
+    symbols
+      .filter(s => s !== "C" && s !== "H")
+      .forEach(symbol => {
+        formula += symbol + (elementCounts[symbol] > 1 ? subscript(elementCounts[symbol]) : "");
+      });
+  } else {
+    // Alphabetical
+    symbols.forEach(symbol => {
+      formula += symbol + (elementCounts[symbol] > 1 ? subscript(elementCounts[symbol]) : "");
+    });
+  }
+
+  return formula;
 }
 
 // ============================================================================
@@ -272,104 +349,99 @@ const ELEMENT_PREFIXES: Record<number, string> = {
   6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
 };
 
-function generateIUPACName(
-  elementInfos: ElementInfo[],
-  isIonic: boolean,
-  isDiatomic: boolean,
-  formula: string
-): string {
-  // Check for diatomic molecules
-  if (isDiatomic && DIATOMIC_MOLECULES[formula.replace(/[₀-₉]/g, m => String.fromCharCode(m.charCodeAt(0) - 8272))]) {
-    const diatomicKey = formula.replace(/[₀-₉]/g, m => String.fromCharCode(m.charCodeAt(0) - 8272));
-    return DIATOMIC_MOLECULES[diatomicKey].name;
+function toRomanNumeral(num: number): string {
+  const romanNumerals: [number, string][] = [
+    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]
+  ];
+  let result = "";
+  for (const [value, numeral] of romanNumerals) {
+    while (num >= value) {
+      result += numeral;
+      num -= value;
+    }
   }
-
-  if (isIonic) {
-    return generateIonicName(elementInfos);
-  } else {
-    return generateCovalentName(elementInfos);
-  }
+  return result;
 }
 
-function generateIonicName(elementInfos: ElementInfo[]): string {
-  const cations = elementInfos.filter(info => {
-    const oxidationState = info.oxidationState || 0;
-    return oxidationState > 0;
-  });
+function generateIonicName(
+  cationElement: Element | null,
+  anionElement: Element | null,
+  detectedIons: DetectedIon[]
+): string {
+  const cationIon = detectedIons.find(d => d.ion.charge > 0);
+  const anionIon = detectedIons.find(d => d.ion.charge < 0);
 
-  const anions = elementInfos.filter(info => {
-    const oxidationState = info.oxidationState || 0;
-    return oxidationState < 0;
-  });
+  let cationName = "";
+  let anionName = "";
 
-  if (cations.length === 0 || anions.length === 0) {
-    return "Unknown Compound";
-  }
-
-  const cation = cations[0];
-  const anion = anions[0];
-
-  let cationName = cation.element.name;
-
-  // Add roman numeral for transition metals with variable oxidation states
-  if (isMetal(cation.element)) {
-    const possibleStates = OXIDATION_STATES[cation.element.symbol];
-    if (possibleStates && possibleStates.length > 1) {
-      const oxidationState = cation.oxidationState || 0;
-      cationName += ` (${toRomanNumeral(oxidationState)})`;
+  // Cation name
+  if (cationIon) {
+    cationName = cationIon.ion.name.charAt(0).toUpperCase() + cationIon.ion.name.slice(1);
+  } else if (cationElement) {
+    cationName = cationElement.name;
+    const charge = OXIDATION_STATES[cationElement.symbol];
+    if (isMetal(cationElement) && charge > 1) {
+      cationName += ` (${toRomanNumeral(charge)})`;
     }
   }
 
-  // Anion name (add -ide suffix)
-  let anionName = anion.element.name.toLowerCase();
-  if (anionName.endsWith("ine")) {
-    anionName = anionName.slice(0, -3) + "ide";
-  } else if (anionName.endsWith("gen")) {
-    anionName = anionName.slice(0, -3) + "ide";
-  } else if (anionName.endsWith("ygen")) {
-    anionName = anionName.slice(0, -4) + "ide";
-  } else if (anionName.endsWith("ur")) {
-    anionName = anionName.slice(0, -2) + "ide";
-  } else if (anionName.endsWith("on")) {
-    anionName = anionName.slice(0, -2) + "ide";
-  } else if (anionName.endsWith("orus")) {
-    anionName = anionName.slice(0, -4) + "ide";
-  } else {
-    anionName += "ide";
+  // Anion name
+  if (anionIon) {
+    anionName = anionIon.ion.name;
+  } else if (anionElement) {
+    let name = anionElement.name.toLowerCase();
+    if (name.endsWith("ine")) {
+      name = name.slice(0, -3) + "ide";
+    } else if (name.endsWith("gen")) {
+      name = name.slice(0, -3) + "ide";
+    } else if (name.endsWith("ygen")) {
+      name = name.slice(0, -4) + "ide";
+    } else if (name.endsWith("ur")) {
+      name = name.slice(0, -2) + "ide";
+    } else if (name.endsWith("on")) {
+      name = name.slice(0, -2) + "ide";
+    } else if (name.endsWith("orus")) {
+      name = name.slice(0, -4) + "ide";
+    } else {
+      name += "ide";
+    }
+    anionName = name;
   }
 
   return `${cationName} ${anionName}`;
 }
 
-function generateCovalentName(elementInfos: ElementInfo[]): string {
-  if (elementInfos.length < 2) return "Unknown Compound";
+function generateCovalentName(elementCounts: Record<string, number>, elementMap: Map<string, Element>): string {
+  const symbols = Object.keys(elementCounts);
+  if (symbols.length < 2) return "Unknown Compound";
 
-  // Sort by electronegativity (less electronegative first)
-  const sorted = [...elementInfos].sort((a, b) => {
-    const enA = getElectronegativity(a.element);
-    const enB = getElectronegativity(b.element);
+  const elements = symbols.map(s => elementMap.get(s)!);
+  const sorted = elements.sort((a, b) => {
+    const enA = a.electronegativity || 0;
+    const enB = b.electronegativity || 0;
     return enA - enB;
   });
 
   const first = sorted[0];
   const second = sorted[1];
+  const firstCount = elementCounts[first.symbol];
+  const secondCount = elementCounts[second.symbol];
 
   let name = "";
 
-  // First element - use prefix only if not mono
-  if (first.count > 1) {
-    name += ELEMENT_PREFIXES[first.count] + first.element.name.toLowerCase();
+  // First element
+  if (firstCount > 1) {
+    name += ELEMENT_PREFIXES[firstCount] + first.name.toLowerCase();
   } else {
-    name += first.element.name;
+    name += first.name;
   }
 
   name += " ";
 
-  // Second element - always use prefix
-  name += ELEMENT_PREFIXES[second.count] || "";
+  // Second element
+  name += ELEMENT_PREFIXES[secondCount] || "";
 
-  // Add -ide suffix
-  let secondName = second.element.name.toLowerCase();
+  let secondName = second.name.toLowerCase();
   if (secondName.endsWith("ine")) {
     secondName = secondName.slice(0, -3) + "ide";
   } else if (secondName.endsWith("gen")) {
@@ -391,21 +463,6 @@ function generateCovalentName(elementInfos: ElementInfo[]): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-function toRomanNumeral(num: number): string {
-  const romanNumerals: [number, string][] = [
-    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]
-  ];
-
-  let result = "";
-  for (const [value, numeral] of romanNumerals) {
-    while (num >= value) {
-      result += numeral;
-      num -= value;
-    }
-  }
-  return result;
-}
-
 // ============================================================================
 // MAIN VALIDATION FUNCTION
 // ============================================================================
@@ -414,11 +471,7 @@ export function validateCompound(
   canvasElements: Array<{ id: string; element: Element; symbol: string }>,
   bonds: Bond[]
 ): ValidationResult {
-  // Count elements
-  const elementCounts: Record<string, number> = {};
-  const elementMap = new Map<string, Element>();
-
-  // Only count bonded elements
+  // Get bonded elements
   const bondedElementIds = new Set<string>();
   bonds.forEach(bond => {
     bondedElementIds.add(bond.fromElementId);
@@ -439,6 +492,10 @@ export function validateCompound(
     };
   }
 
+  // Count elements
+  const elementCounts: Record<string, number> = {};
+  const elementMap = new Map<string, Element>();
+
   bondedElements.forEach(el => {
     elementCounts[el.symbol] = (elementCounts[el.symbol] || 0) + 1;
     elementMap.set(el.symbol, el.element);
@@ -457,24 +514,23 @@ export function validateCompound(
       bondType: "covalent",
       status: "invalid",
       explanation: `Noble gases (${nobleGases.map(e => e.symbol).join(", ")}) do not typically form compounds.`,
-      suggestions: ["Remove noble gas elements", "Noble gases have full valence shells and are chemically inert"],
+      suggestions: ["Remove noble gas elements"],
     };
   }
 
-  // Check for single element (not a compound)
+  // Check for diatomic molecules
   if (symbols.length === 1) {
     const symbol = symbols[0];
     const count = elementCounts[symbol];
     const element = elementMap.get(symbol)!;
-
-    // Check if it's a valid diatomic molecule
     const formulaKey = symbol + count;
+
     if (count === 2 && DIATOMIC_MOLECULES[formulaKey]) {
       const diatomic = DIATOMIC_MOLECULES[formulaKey];
       return {
         isValid: true,
         compoundName: diatomic.name,
-        formula: symbol + subscriptNumber(count),
+        formula: symbol + subscript(count),
         bondType: "covalent",
         status: "valid",
         explanation: `Valid diatomic molecule. ${element.name} naturally exists as ${formulaKey} with ${diatomic.bondType} bonds.`,
@@ -484,17 +540,11 @@ export function validateCompound(
     return {
       isValid: false,
       compoundName: "",
-      formula: symbol + (count > 1 ? subscriptNumber(count) : ""),
+      formula: symbol + (count > 1 ? subscript(count) : ""),
       bondType: "covalent",
       status: "invalid",
-      explanation: `This is not a valid compound. ${element.name} alone does not form a stable compound with this structure.`,
-      suggestions: count === 2 ? [
-        `${symbol}₂ is not a naturally occurring molecule`,
-        `Add different elements to create a compound`
-      ] : [
-        `Single atoms are not compounds`,
-        `Add different elements to create a compound`
-      ],
+      explanation: `This is not a valid compound. ${element.name} alone does not form a stable compound.`,
+      suggestions: ["Add different elements to create a compound"],
     };
   }
 
@@ -516,100 +566,54 @@ export function validateCompound(
     compoundType = "mixed";
   }
 
-  // Calculate oxidation states
-  const elementInfos: ElementInfo[] = symbols.map(symbol => {
-    const element = elementMap.get(symbol)!;
-    const count = elementCounts[symbol];
-
-    // Get bonding partners
-    const partners: Element[] = [];
-    const elementIds = bondedElements.filter(el => el.symbol === symbol).map(el => el.id);
-
-    bonds.forEach(bond => {
-      if (elementIds.includes(bond.fromElementId)) {
-        const partnerEl = bondedElements.find(el => el.id === bond.toElementId);
-        if (partnerEl) partners.push(partnerEl.element);
-      } else if (elementIds.includes(bond.toElementId)) {
-        const partnerEl = bondedElements.find(el => el.id === bond.fromElementId);
-        if (partnerEl) partners.push(partnerEl.element);
-      }
-    });
-
-    const bondTypesWithElement = bonds
-      .filter(bond => elementIds.includes(bond.fromElementId) || elementIds.includes(bond.toElementId))
-      .map(bond => bond.bondType);
-
-    const oxidationState = determineOxidationState(element, partners, bondTypesWithElement);
-
-    return {
-      element,
-      count,
-      oxidationState,
-      charge: oxidationState * count,
-    };
-  });
-
-  // Check charge neutrality for ionic compounds
-  if (isIonic) {
-    const totalCharge = elementInfos.reduce((sum, info) => sum + (info.charge || 0), 0);
-
-    if (totalCharge !== 0) {
-      const cations = elementInfos.filter(info => (info.oxidationState || 0) > 0);
-      const anions = elementInfos.filter(info => (info.oxidationState || 0) < 0);
-
-      if (cations.length > 0 && anions.length > 0) {
-        const cation = cations[0];
-        const anion = anions[0];
-        const cationCharge = Math.abs(cation.oxidationState || 1);
-        const anionCharge = Math.abs(anion.oxidationState || 1);
-
-        // Calculate correct ratio
-        const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
-        const divisor = gcd(cationCharge, anionCharge);
-        const correctCationCount = anionCharge / divisor;
-        const correctAnionCount = cationCharge / divisor;
-
-        return {
-          isValid: false,
-          compoundName: "",
-          formula: generateFormula(elementCounts, isIonic, [cation.element.symbol], [anion.element.symbol]),
-          bondType: "ionic",
-          status: "invalid",
-          explanation: `Charge not balanced. Total charge is ${totalCharge > 0 ? '+' : ''}${totalCharge}.`,
-          suggestions: [
-            `Correct ratio: ${cation.element.symbol}${correctCationCount > 1 ? subscriptNumber(correctCationCount) : ''}${anion.element.symbol}${correctAnionCount > 1 ? subscriptNumber(correctAnionCount) : ''}`,
-            `${cation.element.name} has charge +${cationCharge}, ${anion.element.name} has charge -${anionCharge}`,
-            `You need ${correctCationCount} ${cation.element.symbol} and ${correctAnionCount} ${anion.element.symbol} for charge neutrality`,
-          ],
-          details: {
-            chargeBalance: `Total charge: ${totalCharge > 0 ? '+' : ''}${totalCharge}`,
-            oxidationStates: Object.fromEntries(
-              elementInfos.map(info => [info.element.symbol, info.oxidationState || 0])
-            ),
-          },
-        };
-      }
-    }
-  }
+  // Detect polyatomic ions
+  const detectedIons = detectPolyatomicIons(bondedElements, bonds);
 
   // Generate formula
-  const cations = elementInfos.filter(info => (info.oxidationState || 0) > 0).map(info => info.element.symbol);
-  const anions = elementInfos.filter(info => (info.oxidationState || 0) < 0).map(info => info.element.symbol);
-  const formula = generateFormula(elementCounts, isIonic, cations, anions);
+  let formula: string;
+  let isBalanced = true;
+  let explanation = "";
+
+  if (isIonic) {
+    const result = generateIonicFormula(bondedElements, detectedIons);
+    formula = result.formula;
+    isBalanced = result.isBalanced;
+    explanation = result.explanation;
+
+    if (!isBalanced) {
+      return {
+        isValid: false,
+        compoundName: "",
+        formula: formula,
+        bondType: "ionic",
+        status: "invalid",
+        explanation: `Charge not balanced. ${explanation}`,
+        suggestions: [`Correct formula: ${formula}`],
+      };
+    }
+  } else {
+    formula = generateCovalentFormula(elementCounts);
+  }
 
   // Generate IUPAC name
-  const isDiatomic = symbols.length === 1 && elementCounts[symbols[0]] === 2;
-  const compoundName = generateIUPACName(elementInfos, isIonic, isDiatomic, formula);
+  let compoundName: string;
 
-  // Check for warnings (rare but valid compounds)
+  if (isIonic) {
+    const usedIds = new Set(detectedIons.flatMap(d => d.elementIds));
+    const cationEl = bondedElements.find(el => !usedIds.has(el.id) && isMetal(el.element))?.element || null;
+    const anionEl = bondedElements.find(el => !usedIds.has(el.id) && isNonmetal(el.element))?.element || null;
+    compoundName = generateIonicName(cationEl, anionEl, detectedIons);
+  } else {
+    compoundName = generateCovalentName(elementCounts, elementMap);
+  }
+
+  // Check for warnings
   const warnings: string[] = [];
 
-  // SF₆ warning
   if (symbols.includes("S") && symbols.includes("F") && elementCounts["F"] === 6) {
     warnings.push("SF₆ is a rare but stable compound (hypervalent sulfur)");
   }
 
-  // Peroxide warning
   if (symbols.includes("O") && elementCounts["O"] >= 2) {
     const oxygenBonds = bonds.filter(bond => {
       const fromEl = bondedElements.find(el => el.id === bond.fromElementId);
@@ -634,9 +638,6 @@ export function validateCompound(
     warnings: warnings.length > 0 ? warnings : undefined,
     details: {
       chargeBalance: isIonic ? "Charges balanced ✓" : undefined,
-      oxidationStates: Object.fromEntries(
-        elementInfos.map(info => [info.element.symbol, info.oxidationState || 0])
-      ),
       bondingPattern: `${bonds.length} bond(s) between ${bondedElements.length} atom(s)`,
     },
   };

@@ -7,7 +7,6 @@ import Link from "next/link";
 import ElementsPanel from "@/components/compounds/create/ElementsPanel";
 import CompoundCanvas from "@/components/compounds/create/CompoundCanvas";
 import CompoundDetails from "@/components/compounds/create/CompoundDetails";
-import QuickExamples from "@/components/compounds/create/QuickExamples";
 import { useCompoundCanvasStore } from "@/lib/stores/useCompoundCanvasStore";
 
 export default function EditCompoundPage() {
@@ -19,8 +18,7 @@ export default function EditCompoundPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const { addElement, loadCompound, setCompoundName, setCompoundDescription } =
-    useCompoundCanvasStore();
+  const { loadCompound, loadElementsDirectly } = useCompoundCanvasStore();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -46,24 +44,56 @@ export default function EditCompoundPage() {
       const data = await response.json();
       const compound = data.compound;
 
-      // Load compound data into store
+      // Load compound metadata
       loadCompound(compound);
 
-      // Load elements onto canvas
-      if (compound.elements) {
-        for (const el of compound.elements) {
-          // Fetch full element data
-          const elemResponse = await fetch(`/api/elements/${el.symbol}`);
-          if (elemResponse.ok) {
-            const elemData = await elemResponse.json();
-            const element = elemData.element;
+      // Load elements onto canvas (without auto-bonding)
+      if (compound.elements && compound.elements.length > 0) {
+        // Fetch all element data
+        const canvasElements = await Promise.all(
+          compound.elements.map(async (el: any) => {
+            const elemResponse = await fetch(`/api/elements/${el.symbol}`);
+            if (elemResponse.ok) {
+              const elemData = await elemResponse.json();
+              const element = elemData.element;
 
-            // Add element to canvas with saved position
-            if (element && el.position) {
-              addElement(element, el.position);
+              // Generate unique ID for this instance
+              const id = `${el.symbol}-${Date.now()}-${Math.random()}`;
+
+              return {
+                id,
+                elementId: el.elementId || element._id || element.symbol,
+                symbol: el.symbol,
+                count: el.count || 1,
+                position: el.position || { x: 400, y: 300 },
+                element: element,
+                groupId: compound.bonds && compound.bonds.length > 0 ? "loaded-group" : undefined,
+              };
             }
+            return null;
+          })
+        );
+
+        // Filter out nulls
+        const validElements = canvasElements.filter((el) => el !== null);
+
+        // Map old element IDs to new instance IDs for bonds
+        const idMap = new Map<string, string>();
+        compound.elements.forEach((oldEl: any, idx: number) => {
+          if (validElements[idx]) {
+            idMap.set(oldEl.elementId, validElements[idx].id);
           }
-        }
+        });
+
+        // Update bond IDs to match new instance IDs
+        const updatedBonds = (compound.bonds || []).map((bond: any) => ({
+          ...bond,
+          fromElementId: idMap.get(bond.fromElementId) || bond.fromElementId,
+          toElementId: idMap.get(bond.toElementId) || bond.toElementId,
+        }));
+
+        // Load elements and bonds directly (bypass auto-bonding)
+        loadElementsDirectly(validElements, updatedBonds);
       }
     } catch (err) {
       console.error("Error loading compound:", err);
@@ -90,10 +120,7 @@ export default function EditCompoundPage() {
       <div className="min-h-screen bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-400 text-xl mb-4">{error}</p>
-          <Link
-            href="/compounds"
-            className="text-blue-400 hover:text-blue-300 transition-colors"
-          >
+          <Link href="/compounds" className="text-blue-400 hover:text-blue-300 transition-colors">
             Back to Compounds
           </Link>
         </div>
@@ -102,53 +129,13 @@ export default function EditCompoundPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
-      {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/compounds"
-                className="inline-flex items-center text-white/60 hover:text-white transition-colors"
-              >
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
-                Back to Compounds
-              </Link>
-              <div className="h-6 w-px bg-gray-700" />
-              <h1 className="text-2xl font-bold text-white">Edit Compound</h1>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-gray-400">
-                Logged in as <span className="text-white">{session.user?.name}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex h-[calc(100vh-73px)]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
+      <div className="flex h-[calc(100vh-3.5rem)]">
         {/* Elements Panel - Left */}
         <ElementsPanel />
 
         {/* Canvas - Center (Maximum Area) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Quick Examples */}
-          <QuickExamples />
-
           {/* Canvas */}
           <div id="compound-canvas" className="flex-1 overflow-auto">
             <CompoundCanvas />

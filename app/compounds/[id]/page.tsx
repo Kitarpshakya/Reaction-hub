@@ -142,38 +142,14 @@ export default function CompoundDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <Link
-            href="/compounds"
-            className="inline-flex items-center text-white/60 hover:text-white transition-colors text-sm mb-6"
-          >
-            <svg
-              className="w-4 h-4 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            Back to Compounds
-          </Link>
-
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
-                {compound.name}
-              </h1>
-              <p className="text-5xl font-mono text-[#6C5CE7] mb-4">
-                {compound.formula}
-              </p>
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">{compound.name}</h1>
+              <p className="text-5xl font-mono text-[#6C5CE7] mb-4">{compound.formula}</p>
             </div>
 
             {isOwner && (
@@ -181,12 +157,7 @@ export default function CompoundDetailPage() {
                 href={`/compounds/${compound.id}/edit`}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-[#6C5CE7] text-white rounded-xl font-semibold hover:bg-[#5B4CD6] transition-colors"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -237,14 +208,9 @@ export default function CompoundDetailPage() {
                   <p className="text-white/40 text-sm">Elements</p>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {compound.elements.map((el, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-[#6C5CE7]/20 border border-[#6C5CE7]/50 rounded-lg px-3 py-1"
-                      >
+                      <div key={idx} className="bg-[#6C5CE7]/20 border border-[#6C5CE7]/50 rounded-lg px-3 py-1">
                         <span className="text-white font-mono">{el.symbol}</span>
-                        {el.count > 1 && (
-                          <span className="text-white/60 text-sm ml-1">×{el.count}</span>
-                        )}
+                        {el.count > 1 && <span className="text-white/60 text-sm ml-1">×{el.count}</span>}
                       </div>
                     ))}
                   </div>
@@ -254,33 +220,14 @@ export default function CompoundDetailPage() {
                     <p className="text-white/40 text-sm">Bonds</p>
                     <p className="text-white text-lg">{compound.bonds.length}</p>
                     <div className="mt-2 space-y-1">
-                      {Array.from(
-                        new Set(compound.bonds.map((b) => b.bondType))
-                      ).map((type) => (
-                        <div
-                          key={type}
-                          className="text-sm text-white/70 capitalize"
-                        >
+                      {Array.from(new Set(compound.bonds.map((b) => b.bondType))).map((type) => (
+                        <div key={type} className="text-sm text-white/70 capitalize">
                           • {type} bond ({compound.bonds!.filter((b) => b.bondType === type).length})
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-                <div>
-                  <p className="text-white/40 text-sm">Created By</p>
-                  <p className="text-white">{compound.createdByName}</p>
-                </div>
-                <div>
-                  <p className="text-white/40 text-sm">Created</p>
-                  <p className="text-white">
-                    {new Date(compound.createdAt).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
               </div>
             </motion.div>
 
@@ -298,7 +245,7 @@ export default function CompoundDetailPage() {
             )}
 
             {/* External Factors */}
-            {compound.externalFactors && Object.values(compound.externalFactors).some(f => f?.enabled) && (
+            {compound.externalFactors && Object.values(compound.externalFactors).some((f) => f?.enabled) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -311,8 +258,7 @@ export default function CompoundDetailPage() {
                     <div>
                       <p className="text-white/40 text-sm">Temperature</p>
                       <p className="text-white">
-                        {compound.externalFactors.temperature.value}{" "}
-                        {compound.externalFactors.temperature.unit}
+                        {compound.externalFactors.temperature.value} {compound.externalFactors.temperature.unit}
                       </p>
                     </div>
                   )}
@@ -320,8 +266,7 @@ export default function CompoundDetailPage() {
                     <div>
                       <p className="text-white/40 text-sm">Pressure</p>
                       <p className="text-white">
-                        {compound.externalFactors.pressure.value}{" "}
-                        {compound.externalFactors.pressure.unit}
+                        {compound.externalFactors.pressure.value} {compound.externalFactors.pressure.unit}
                       </p>
                     </div>
                   )}
@@ -330,18 +275,14 @@ export default function CompoundDetailPage() {
                       <p className="text-white/40 text-sm">Catalyst</p>
                       <p className="text-white">{compound.externalFactors.catalyst.name}</p>
                       {compound.externalFactors.catalyst.details && (
-                        <p className="text-white/60 text-sm">
-                          {compound.externalFactors.catalyst.details}
-                        </p>
+                        <p className="text-white/60 text-sm">{compound.externalFactors.catalyst.details}</p>
                       )}
                     </div>
                   )}
                   {compound.externalFactors.heat?.enabled && (
                     <div>
                       <p className="text-white/40 text-sm">Heat</p>
-                      <p className="text-white">
-                        {compound.externalFactors.heat.details || "Applied"}
-                      </p>
+                      <p className="text-white">{compound.externalFactors.heat.details || "Applied"}</p>
                     </div>
                   )}
                   {compound.externalFactors.light?.enabled && (
@@ -353,9 +294,7 @@ export default function CompoundDetailPage() {
                           : "Applied"}
                       </p>
                       {compound.externalFactors.light.details && (
-                        <p className="text-white/60 text-sm">
-                          {compound.externalFactors.light.details}
-                        </p>
+                        <p className="text-white/60 text-sm">{compound.externalFactors.light.details}</p>
                       )}
                     </div>
                   )}
@@ -374,11 +313,7 @@ export default function CompoundDetailPage() {
               <h2 className="text-xl font-bold text-white mb-4">Structure Visualization</h2>
 
               {allElements.length > 0 ? (
-                <CompoundVisualization
-                  elements={compound.elements}
-                  bonds={compound.bonds}
-                  allElements={allElements}
-                />
+                <CompoundVisualization elements={compound.elements} bonds={compound.bonds} allElements={allElements} />
               ) : (
                 <div className="bg-gray-900 rounded-lg p-8 text-center">
                   <div className="text-gray-400">Loading visualization...</div>

@@ -5,18 +5,14 @@ import { BondType } from "@/lib/types/compound";
  * Determines the bond type between two elements based on chemistry laws
  */
 export function determineBondType(element1: Element, element2: Element): BondType {
-  // Get electronegativities
   const en1 = element1.electronegativity || 0;
   const en2 = element2.electronegativity || 0;
 
-  // If either element has no electronegativity data, default to single covalent
   if (en1 === 0 || en2 === 0) {
     return "single";
   }
 
   const enDifference = Math.abs(en1 - en2);
-
-  // Check if either element is a metal
   const isMetal1 = isMetal(element1);
   const isMetal2 = isMetal(element2);
 
@@ -30,11 +26,7 @@ export function determineBondType(element1: Element, element2: Element): BondTyp
     return "ionic";
   }
 
-  // Polar covalent or non-polar covalent (0.4 - 1.7 difference)
-  // For simplicity, we'll classify all covalent bonds
-  // Could be single, double, or triple based on valence electrons
-
-  // Check for potential multiple bonds based on elements
+  // Covalent bonds: check for potential multiple bonds
   const bondOrder = estimateBondOrder(element1, element2);
 
   if (bondOrder === 3) {
@@ -49,7 +41,7 @@ export function determineBondType(element1: Element, element2: Element): BondTyp
 /**
  * Checks if an element is a metal
  */
-function isMetal(element: Element): boolean {
+export function isMetal(element: Element): boolean {
   const metalCategories = [
     "alkali-metal",
     "alkaline-earth-metal",
@@ -58,13 +50,18 @@ function isMetal(element: Element): boolean {
     "lanthanide",
     "actinide",
   ];
-
   return metalCategories.includes(element.category);
 }
 
 /**
+ * Checks if an element is a nonmetal
+ */
+export function isNonmetal(element: Element): boolean {
+  return element.category === "nonmetal" || element.category === "halogen";
+}
+
+/**
  * Estimates bond order (1, 2, or 3) based on elements
- * This is a simplified heuristic
  */
 function estimateBondOrder(element1: Element, element2: Element): number {
   const symbol1 = element1.symbol;
@@ -86,21 +83,18 @@ function estimateBondOrder(element1: Element, element2: Element): number {
     ["N", "O"], // N=O
   ];
 
-  // Check for triple bonds
   for (const [a, b] of tripleBondPairs) {
     if ((symbol1 === a && symbol2 === b) || (symbol1 === b && symbol2 === a)) {
       return 3;
     }
   }
 
-  // Check for double bonds
   for (const [a, b] of doubleBondPairs) {
     if ((symbol1 === a && symbol2 === b) || (symbol1 === b && symbol2 === a)) {
       return 2;
     }
   }
 
-  // Default to single bond
   return 1;
 }
 
@@ -110,67 +104,39 @@ function estimateBondOrder(element1: Element, element2: Element): number {
 export function getValence(element: Element): number {
   const symbol = element.symbol;
 
-  // Common valences based on periodic table groups
   const valenceMap: Record<string, number> = {
-    // Group 1: Alkali metals
     H: 1, Li: 1, Na: 1, K: 1, Rb: 1, Cs: 1, Fr: 1,
-
-    // Group 2: Alkaline earth metals
     Be: 2, Mg: 2, Ca: 2, Sr: 2, Ba: 2, Ra: 2,
-
-    // Group 13
     B: 3, Al: 3, Ga: 3, In: 3, Tl: 3,
-
-    // Group 14
     C: 4, Si: 4, Ge: 4, Sn: 4, Pb: 4,
-
-    // Group 15
     N: 3, P: 3, As: 3, Sb: 3, Bi: 3,
-
-    // Group 16
     O: 2, S: 2, Se: 2, Te: 2, Po: 2,
-
-    // Group 17: Halogens
     F: 1, Cl: 1, Br: 1, I: 1, At: 1,
-
-    // Group 18: Noble gases (typically 0, but can form compounds)
     He: 0, Ne: 0, Ar: 0, Kr: 0, Xe: 0, Rn: 0,
+    Fe: 3, Cu: 2, Zn: 2, Ag: 1, Au: 3,
+    Ni: 2, Co: 2, Cr: 3, Mn: 2, Ti: 4,
   };
 
-  const valence = valenceMap[symbol];
-
-  // Log for debugging
-  if (valence === undefined) {
-    console.warn(`No valence defined for element ${symbol}, using default 2`);
-    return 2; // Default to 2 for unknown elements
-  }
-
-  return valence;
+  return valenceMap[symbol] ?? 2;
 }
 
 /**
- * Gets the bond value (number of valence electrons used) for a bond type
+ * Gets the bond value for a bond type
  */
 function getBondValue(bondType: BondType): number {
   switch (bondType) {
-    case "single":
-      return 1;
-    case "double":
-      return 2;
-    case "triple":
-      return 3;
+    case "single": return 1;
+    case "double": return 2;
+    case "triple": return 3;
     case "ionic":
     case "covalent":
     case "metallic":
-      return 1;
-    default:
-      return 1;
+    default: return 1;
   }
 }
 
 /**
- * Gets the number of valence electrons used by an element's bonds
- * Accounts for bond types: single=1, double=2, triple=3
+ * Counts total valence electrons used by an element's bonds
  */
 export function countElementBonds(
   elementId: string,
@@ -180,14 +146,9 @@ export function countElementBonds(
     (bond) => bond.fromElementId === elementId || bond.toElementId === elementId
   );
 
-  const totalBondValue = elementBonds.reduce((total, bond) => {
-    const bondValue = getBondValue(bond.bondType || "single");
-    console.log(`  Bond ${bond.fromElementId}-${bond.toElementId} type: ${bond.bondType || "single"} = ${bondValue} valence`);
-    return total + bondValue;
+  return elementBonds.reduce((total, bond) => {
+    return total + getBondValue(bond.bondType || "single");
   }, 0);
-
-  console.log(`Total valence used by element ${elementId}: ${totalBondValue}`);
-  return totalBondValue;
 }
 
 /**
@@ -219,7 +180,7 @@ export function bondExists(
 }
 
 /**
- * Validates if a bond between two elements is chemically reasonable
+ * Validates if a bond can be formed between two elements
  */
 export function canFormBond(
   element1: Element,
@@ -228,48 +189,22 @@ export function canFormBond(
   elementId2: string,
   bonds: Array<{ fromElementId: string; toElementId: string; bondType?: BondType }>
 ): boolean {
-  const symbol1 = element1.symbol;
-  const symbol2 = element2.symbol;
-
-  // Noble gases generally don't bond (with rare exceptions)
   if (element1.category === "noble-gas" || element2.category === "noble-gas") {
-    console.log(`Cannot bond ${symbol1}-${symbol2}: noble gas`);
     return false;
   }
 
-  // Check if bond already exists
   if (bondExists(elementId1, elementId2, bonds)) {
-    console.log(`Cannot bond ${symbol1}-${symbol2}: bond already exists`);
     return false;
   }
 
-  // Check if both elements have available valence
   const available1 = getAvailableValence(element1, elementId1, bonds);
   const available2 = getAvailableValence(element2, elementId2, bonds);
 
-  console.log(`Bond check ${symbol1}-${symbol2}:`, {
-    valence1: getValence(element1),
-    valence2: getValence(element2),
-    available1,
-    available2,
-    currentBonds1: countElementBonds(elementId1, bonds),
-    currentBonds2: countElementBonds(elementId2, bonds),
-  });
-
-  if (available1 <= 0 || available2 <= 0) {
-    console.log(
-      `Cannot bond ${symbol1}-${symbol2}: insufficient valence (${available1}, ${available2})`
-    );
-    return false;
-  }
-
-  // All other checks passed
-  console.log(`✓ Can bond ${symbol1}-${symbol2}`);
-  return true;
+  return available1 > 0 && available2 > 0;
 }
 
 /**
- * Calculates the distance between two points
+ * Calculates distance between two points
  */
 export function calculateDistance(
   pos1: { x: number; y: number },
@@ -303,7 +238,6 @@ export function getBondDisplayName(bondType: BondType): string {
     covalent: "Covalent Bond",
     metallic: "Metallic Bond",
   };
-
   return names[bondType] || bondType;
 }
 
@@ -317,22 +251,41 @@ export function shouldAutoGroup(
 ): string[] {
   const nearbyElements: string[] = [];
 
-  console.log(`Checking auto-bond proximity (threshold: ${threshold}px)`);
-
   for (const el of elements) {
     if (el.id !== newElement.id) {
       const distance = calculateDistance(el.position, newElement.position);
-      const isClose = distance <= threshold;
-
-      console.log(`  Distance to ${el.id}: ${distance.toFixed(1)}px ${isClose ? "✓ NEARBY" : ""}`);
-
-      if (isClose) {
+      if (distance <= threshold) {
         nearbyElements.push(el.id);
       }
     }
   }
 
-  console.log(`Found ${nearbyElements.length} nearby elements for auto-bonding`);
-
   return nearbyElements;
+}
+
+/**
+ * Get element category color
+ */
+export function getElementCategoryColor(category: string): string {
+  const colorMap: Record<string, string> = {
+    "nonmetal": "#4ECDC4",
+    "noble-gas": "#95E1D3",
+    "alkali-metal": "#F38181",
+    "alkaline-earth-metal": "#FDCB6E",
+    "transition-metal": "#A29BFE",
+    "post-transition-metal": "#74B9FF",
+    "metalloid": "#FD79A8",
+    "halogen": "#FF7675",
+    "lanthanide": "#FFEAA7",
+    "actinide": "#DFE6E9",
+    "unknown": "#B2BEC3",
+  };
+  return colorMap[category] || colorMap["unknown"];
+}
+
+/**
+ * Calculate element bubble radius based on atomic mass
+ */
+export function calculateBubbleRadius(atomicMass: number, scaleFactor: number = 3): number {
+  return Math.sqrt(atomicMass) * scaleFactor;
 }

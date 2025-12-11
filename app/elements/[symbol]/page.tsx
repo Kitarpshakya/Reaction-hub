@@ -58,11 +58,7 @@ export async function generateStaticParams() {
   }
 }
 
-export default async function ElementDetailPage({
-  params,
-}: {
-  params: Promise<{ symbol: string }>;
-}) {
+export default async function ElementDetailPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol } = await params;
   const element = await getElement(symbol);
 
@@ -71,15 +67,9 @@ export default async function ElementDetailPage({
   }
 
   const allElements = await getAllElements();
-  const currentIndex = allElements.findIndex(
-    (el) => el.symbol === element.symbol
-  );
-  const prevElement =
-    currentIndex > 0 ? allElements[currentIndex - 1] : null;
-  const nextElement =
-    currentIndex < allElements.length - 1
-      ? allElements[currentIndex + 1]
-      : null;
+  const currentIndex = allElements.findIndex((el) => el.symbol === element.symbol);
+  const prevElement = currentIndex > 0 ? allElements[currentIndex - 1] : null;
+  const nextElement = currentIndex < allElements.length - 1 ? allElements[currentIndex + 1] : null;
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -90,18 +80,8 @@ export default async function ElementDetailPage({
             href="/periodic-table"
             className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Back to Table
           </Link>
@@ -139,14 +119,10 @@ export default async function ElementDetailPage({
         <PropertyGrid element={element} />
 
         {/* Discovery Info */}
-        {(element.discoveredBy || element.yearDiscovered) && (
-          <DiscoverySection element={element} />
-        )}
+        {(element.discoveredBy || element.yearDiscovered) && <DiscoverySection element={element} />}
 
         {/* Isotopes */}
-        {element.isotopes && element.isotopes.length > 0 && (
-          <IsotopesSection isotopes={element.isotopes} />
-        )}
+        {element.isotopes && element.isotopes.length > 0 && <IsotopesSection isotopes={element.isotopes} />}
 
         {/* Summary */}
         <div className="mt-6 md:mt-8 bg-gray-800/50 border border-gray-700 rounded-lg p-4 md:p-6">

@@ -67,6 +67,7 @@ interface CompoundCanvasState {
 
   // Load compound for editing
   loadCompound: (compound: any) => void;
+  loadElementsDirectly: (elements: CanvasElement[], bonds: Bond[]) => void;
 }
 
 export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => ({
@@ -476,14 +477,37 @@ export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => 
   },
 
   loadCompound: (compound) => {
-    // This will be implemented to load existing compound for editing
+    console.log("Loading compound for editing:", compound);
+
+    // Reset first to clear any existing state
+    set({
+      canvasElements: [],
+      selectedElementId: null,
+      selectedBondId: null,
+      bonds: [],
+      externalFactors: {},
+      compoundName: "",
+      compoundDescription: "",
+      zoom: 1,
+      offset: { x: 0, y: 0 },
+    });
+
+    // Set compound metadata
     set({
       compoundName: compound.name || "",
       compoundDescription: compound.description || "",
-      bonds: compound.bonds || [],
       externalFactors: compound.externalFactors || {},
       zoom: compound.canvasData?.zoom || 1,
       offset: compound.canvasData?.offset || { x: 0, y: 0 },
+    });
+  },
+
+  // New method to load elements directly without auto-bonding
+  loadElementsDirectly: (elements: CanvasElement[], bonds: Bond[]) => {
+    console.log("Loading elements and bonds directly:", elements.length, "elements,", bonds.length, "bonds");
+    set({
+      canvasElements: elements,
+      bonds: bonds,
     });
   },
 }));

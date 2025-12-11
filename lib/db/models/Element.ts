@@ -18,6 +18,7 @@ const ElementSchema = new Schema<IElement>(
 
     // Classification
     category: { type: String, required: true },
+    categories: { type: [String], default: undefined }, // Optional: Multiple categories (e.g., halogens are both "halogen" and "nonmetal")
     group: { type: Number, default: null },
     period: { type: Number, required: true },
     block: { type: String, required: true },

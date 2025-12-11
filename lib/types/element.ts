@@ -27,7 +27,8 @@ export interface Element {
   atomicMass: number; // 1.008, 4.0026
 
   // Classification
-  category: ElementCategory;
+  category: ElementCategory; // Primary category
+  categories?: ElementCategory[]; // Optional: Multiple categories (e.g., halogens are both "halogen" and "nonmetal")
   group: number | null; // 1-18
   period: number; // 1-7
   block: string; // "s", "p", "d", "f"
@@ -77,7 +78,8 @@ export interface ElementCard {
   symbol: string;
   name: string;
   atomicMass: number;
-  category: ElementCategory;
+  category: ElementCategory; // Primary category
+  categories?: ElementCategory[]; // Optional: Multiple categories
   color: string;
   gridRow: number;
   gridColumn: number;
