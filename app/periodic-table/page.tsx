@@ -35,14 +35,14 @@ export default function PeriodicTablePage() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
+      <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6C5CE7]"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
       {/* Main Content */}
       <main className="w-full overflow-hidden">
         {elements.length === 0 ? (
@@ -54,15 +54,9 @@ export default function PeriodicTablePage() {
         ) : (
           <>
             {/* Legend */}
-            <TableLegend
-              selectedCategory={selectedCategory}
-              onCategoryClick={handleCategoryClick}
-            />
+            <TableLegend selectedCategory={selectedCategory} onCategoryClick={handleCategoryClick} />
             {/* Periodic Table */}
-            <PeriodicTableGrid
-              elements={elements}
-              selectedCategory={selectedCategory}
-            />
+            <PeriodicTableGrid elements={elements} selectedCategory={selectedCategory} />
           </>
         )}
       </main>

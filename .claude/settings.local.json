@@ -1,6 +1,8 @@
 {
   "permissions": {
-    "allow": [
+    "allow": [],
+    "deny": [],
+    "ask": [
       "WebSearch",
       "Bash(npm install:*)",
       "Bash(mkdir:*)",
@@ -17,8 +19,6 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(node -e:*)"
-    ],
-    "deny": [],
-    "ask": []
+    ]
   }
 }

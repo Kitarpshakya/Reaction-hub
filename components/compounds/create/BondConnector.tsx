@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bond, BondType } from "@/lib/types/compound";
-import { getBondDisplayName } from "@/lib/utils/chemistry-helpers";
+import { Bond } from "@/lib/types/compound";
 
 interface BondConnectorProps {
   bond: Bond;
@@ -60,10 +59,10 @@ export default function BondConnector({
         y1={fromPosition.y}
         x2={toPosition.x}
         y2={toPosition.y}
-        stroke={isSelected ? "#3B82F6" : "#6B7280"}
-        strokeWidth={bondStyle.strokeWidth}
+        stroke={isSelected ? "#60A5FA" : "#9CA3AF"}
+        strokeWidth={isSelected ? bondStyle.strokeWidth + 2 : bondStyle.strokeWidth}
         strokeDasharray={bondStyle.strokeDasharray}
-        className="cursor-pointer hover:stroke-blue-400 transition-colors"
+        className="cursor-pointer hover:stroke-blue-400 transition-all"
         onClick={(e) => {
           e.stopPropagation();
           onSelect();
@@ -89,10 +88,10 @@ export default function BondConnector({
       {isSelected && (
         <g transform={`translate(${midX}, ${midY})`}>
           <circle
-            r="14"
+            r="10"
             fill="#EF4444"
             stroke="white"
-            strokeWidth="2"
+            strokeWidth="1.5"
             className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
@@ -105,7 +104,7 @@ export default function BondConnector({
             textAnchor="middle"
             dominantBaseline="central"
             fill="white"
-            fontSize="18"
+            fontSize="14"
             fontWeight="bold"
             className="pointer-events-none"
           >
@@ -115,34 +114,6 @@ export default function BondConnector({
         </g>
       )}
 
-      {/* Bond type label (shown when selected or on hover) */}
-      {isSelected && (
-        <g transform={`translate(${midX}, ${midY - 30})`}>
-          <rect
-            x="-50"
-            y="-12"
-            width="100"
-            height="24"
-            fill="white"
-            stroke="#3B82F6"
-            strokeWidth="2"
-            rx="6"
-            className="drop-shadow-lg"
-          />
-          <text
-            x="0"
-            y="0"
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill="#1F2937"
-            fontSize="11"
-            fontWeight="600"
-            className="pointer-events-none"
-          >
-            {getBondDisplayName(bond.bondType)}
-          </text>
-        </g>
-      )}
     </g>
   );
 }

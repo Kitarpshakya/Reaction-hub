@@ -77,9 +77,9 @@ export default function ElementBubble({
       style={style}
       className={`rounded-full flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
         isSelected
-          ? "ring-4 ring-blue-400 shadow-lg shadow-blue-400/50 scale-105"
+          ? "ring-2 ring-blue-400 shadow-md shadow-blue-400/50 scale-105"
           : isBonded
-          ? "ring-2 shadow-md hover:scale-105 hover:shadow-lg"
+          ? "ring-1 shadow-md hover:scale-105 hover:shadow-lg"
           : "ring-2 ring-dashed ring-yellow-400 shadow-md hover:scale-105 hover:shadow-lg"
       }`}
       onClick={handleElementClick}
@@ -111,7 +111,7 @@ export default function ElementBubble({
         onTouchStart={(e) => {
           e.stopPropagation();
         }}
-        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-red-600 active:bg-red-700 transition-colors shadow-lg z-20 cursor-pointer font-bold text-lg border-2 border-white"
+        className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600 active:bg-red-700 transition-colors shadow-md z-20 cursor-pointer font-bold text-sm border border-white"
         title="Remove element"
         type="button"
       >
@@ -121,7 +121,7 @@ export default function ElementBubble({
       {/* Unbonded indicator */}
       {!isBonded && (
         <div
-          className="absolute -bottom-1 -left-1 bg-yellow-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-xl z-30 text-sm font-bold border-2 border-white"
+          className="absolute -bottom-0.5 -left-0.5 bg-yellow-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md z-30 text-xs font-bold border border-white"
           title="Unbonded - not included in formula"
           style={{ pointerEvents: "none" }}
         >
@@ -132,7 +132,7 @@ export default function ElementBubble({
       {/* Available valence indicator (shown when selected) */}
       {isSelected && availableValence > 0 && (
         <div
-          className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-green-500 text-white rounded px-2 py-1 flex items-center justify-center shadow-xl z-50 text-xs font-bold whitespace-nowrap border-2 border-white"
+          className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 bg-green-500 text-white rounded px-1.5 py-0.5 flex items-center justify-center shadow-md z-50 text-[10px] font-bold whitespace-nowrap border border-white"
           title={`Can form ${availableValence} more bond${availableValence > 1 ? "s" : ""}`}
           style={{ pointerEvents: "none" }}
         >
@@ -143,7 +143,7 @@ export default function ElementBubble({
       {/* Full valence indicator (shown when selected and no bonds available) */}
       {isSelected && availableValence === 0 && isBonded && (
         <div
-          className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-red-500 text-white rounded px-2 py-1 flex items-center justify-center shadow-xl z-50 text-xs font-bold whitespace-nowrap border-2 border-white"
+          className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 bg-red-500 text-white rounded px-1.5 py-0.5 flex items-center justify-center shadow-md z-50 text-[10px] font-bold whitespace-nowrap border border-white"
           title="Cannot form more bonds"
           style={{ pointerEvents: "none" }}
         >

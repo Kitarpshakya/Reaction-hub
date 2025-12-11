@@ -22,10 +22,10 @@ function PropertyCard({ label, value, unit, index }: PropertyCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 md:p-4 hover:border-gray-600 transition-colors min-h-[80px] flex flex-col justify-between"
+      className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 md:p-4 hover:border-gray-600 transition-colors min-h-20 flex flex-col justify-between"
     >
       <div className="text-gray-400 text-xs md:text-sm mb-1 leading-tight">{label}</div>
-      <div className="text-white text-base md:text-xl font-semibold break-words">
+      <div className="text-white text-base md:text-xl font-semibold wrap-break-word">
         {value} {unit && <span className="text-gray-400 text-sm md:text-base">{unit}</span>}
       </div>
     </motion.div>

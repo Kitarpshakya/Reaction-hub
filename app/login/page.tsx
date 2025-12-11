@@ -1,33 +1,33 @@
-"use client"
+"use client";
 
-import { signIn, useSession } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect } from "react"
-import { motion } from "framer-motion"
-import Link from "next/link"
+import { signIn, useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function LoginPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/"
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   useEffect(() => {
     if (session) {
-      router.push(callbackUrl)
+      router.push(callbackUrl);
     }
-  }, [session, router, callbackUrl])
+  }, [session, router, callbackUrl]);
 
   if (status === "loading") {
     return (
-      <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
+      <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6C5CE7]"></div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center px-4">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center px-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -36,22 +36,9 @@ export default function LoginPage() {
       >
         {/* Back Button */}
         <div className="mb-8">
-          <Link
-            href="/"
-            className="inline-flex items-center text-white/60 hover:text-white transition-colors text-sm"
-          >
-            <svg
-              className="w-4 h-4 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
+          <Link href="/" className="inline-flex items-center text-white/60 hover:text-white transition-colors text-sm">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Back to Home
           </Link>
@@ -60,12 +47,8 @@ export default function LoginPage() {
         {/* Login Card */}
         <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 md:p-12">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">
-              REACTION HUB
-            </h1>
-            <p className="text-white/60 text-lg">
-              Sign in to continue
-            </p>
+            <h1 className="text-4xl font-bold text-white mb-2">REACTION HUB</h1>
+            <p className="text-white/60 text-lg">Sign in to continue</p>
           </div>
 
           <div className="space-y-4">
@@ -98,9 +81,7 @@ export default function LoginPage() {
               </motion.button>
             ) : (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 text-center">
-                <p className="text-yellow-400 font-semibold mb-2">
-                  ⚠️ Google OAuth Not Configured
-                </p>
+                <p className="text-yellow-400 font-semibold mb-2">⚠️ Google OAuth Not Configured</p>
                 <p className="text-white/60 text-sm mb-4">
                   To enable authentication, please configure Google OAuth credentials in your .env file
                 </p>
@@ -122,5 +103,5 @@ export default function LoginPage() {
         </div>
       </motion.div>
     </div>
-  )
+  );
 }

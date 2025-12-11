@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 
 export default function Home() {
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12 text-center">
         <motion.div
@@ -22,7 +22,7 @@ export default function Home() {
           {/* Periodic Table Card */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.1 }}>
             <Link href="/periodic-table" prefetch={true}>
-              <div className="group bg-gradient-to-br from-[#6C5CE7]/20 to-[#4ECDC4]/20 border border-white/10 rounded-2xl p-8 h-full cursor-pointer hover:border-[#6C5CE7]/50 transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#6C5CE7]/20">
+              <div className="group bg-linear-to-br from-[#6C5CE7]/20 to-[#4ECDC4]/20 border border-white/10 rounded-2xl p-8 h-full cursor-pointer hover:border-[#6C5CE7]/50 transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#6C5CE7]/20">
                 <div className="text-6xl mb-6">🧪</div>
                 <h2 className="text-3xl font-bold text-white mb-4">Periodic Table</h2>
                 <p className="text-white/70 mb-6 text-lg">
@@ -42,7 +42,7 @@ export default function Home() {
           {/* Compounds Card */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.2 }}>
             <Link href="/compounds" prefetch={true}>
-              <div className="group bg-gradient-to-br from-[#F38181]/20 to-[#FDCB6E]/20 border border-white/10 rounded-2xl p-8 h-full cursor-pointer hover:border-[#F38181]/50 transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#F38181]/20">
+              <div className="group bg-linear-to-br from-[#F38181]/20 to-[#FDCB6E]/20 border border-white/10 rounded-2xl p-8 h-full cursor-pointer hover:border-[#F38181]/50 transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#F38181]/20">
                 <div className="text-6xl mb-6">⚗️</div>
                 <h2 className="text-3xl font-bold text-white mb-4">Compounds</h2>
                 <p className="text-white/70 mb-4 text-lg">Browse and create chemical compounds</p>

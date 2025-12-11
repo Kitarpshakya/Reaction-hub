@@ -72,7 +72,7 @@ export default async function ElementDetailPage({ params }: { params: Promise<{ 
   const nextElement = currentIndex < allElements.length - 1 ? allElements[currentIndex + 1] : null;
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Navigation Header */}
       <header className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-700">
         <div className="container mx-auto px-4 py-2 flex items-center justify-between">

@@ -51,7 +51,7 @@ export default function CompoundsPage() {
   });
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
       <div className="container mx-auto px-4 py-6">
         {/* Header with Search and Create Button */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -153,9 +153,7 @@ export default function CompoundsPage() {
           <div className="text-center py-20">
             <div className="text-6xl mb-6">🔍</div>
             <h2 className="text-2xl font-bold text-white mb-2">No compounds found</h2>
-            <p className="text-white/60 mb-6">
-              No compounds match your search for &quot;{searchQuery}&quot;
-            </p>
+            <p className="text-white/60 mb-6">No compounds match your search for &quot;{searchQuery}&quot;</p>
             <button
               onClick={() => setSearchQuery("")}
               className="inline-block px-6 py-3 bg-white/10 text-white rounded-xl font-semibold hover:bg-white/20 transition-colors"

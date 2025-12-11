@@ -8,9 +8,11 @@ import {
   shouldAutoGroup,
   canFormBond,
   determineBondType,
+  getBondDisplayName,
 } from "@/lib/utils/chemistry-helpers";
 import ElementBubble from "./ElementBubble";
 import BondConnector from "./BondConnector";
+import { BondType } from "@/lib/types/compound";
 
 export default function CompoundCanvas() {
   const {
@@ -24,6 +26,7 @@ export default function CompoundCanvas() {
     selectElement,
     selectBond,
     removeBond,
+    updateBondType,
   } = useCompoundCanvasStore();
 
   const dragStartTimeRef = React.useRef<number>(0);
@@ -309,6 +312,74 @@ export default function CompoundCanvas() {
               </div>
             </div>
           )}
+
+          {/* Bond Control Panel (shown when bond is selected) */}
+          {selectedBondId && (() => {
+            const selectedBond = bonds.find(b => b.id === selectedBondId);
+            if (!selectedBond) return null;
+
+            return (
+              <div className="absolute top-4 right-4 bg-gray-800 border border-gray-600 rounded-lg shadow-xl p-3 z-50">
+                <div className="text-xs text-gray-400 mb-2 font-medium">Bond Controls</div>
+                <div className="mb-3 pb-3 border-b border-gray-700">
+                  <div className="text-xs text-gray-400 mb-1">Current Type:</div>
+                  <div className="text-sm text-white font-semibold">{getBondDisplayName(selectedBond.bondType)}</div>
+                </div>
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => updateBondType(selectedBond.id, "single")}
+                    className={`w-full px-3 py-1.5 text-xs font-medium rounded transition-colors text-left ${
+                      selectedBond.bondType === "single"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    }`}
+                  >
+                    Single Bond
+                  </button>
+                  <button
+                    onClick={() => updateBondType(selectedBond.id, "double")}
+                    className={`w-full px-3 py-1.5 text-xs font-medium rounded transition-colors text-left ${
+                      selectedBond.bondType === "double"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    }`}
+                  >
+                    Double Bond
+                  </button>
+                  <button
+                    onClick={() => updateBondType(selectedBond.id, "triple")}
+                    className={`w-full px-3 py-1.5 text-xs font-medium rounded transition-colors text-left ${
+                      selectedBond.bondType === "triple"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    }`}
+                  >
+                    Triple Bond
+                  </button>
+                  <button
+                    onClick={() => updateBondType(selectedBond.id, "ionic")}
+                    className={`w-full px-3 py-1.5 text-xs font-medium rounded transition-colors text-left ${
+                      selectedBond.bondType === "ionic"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    }`}
+                  >
+                    Ionic Bond
+                  </button>
+                  <button
+                    onClick={() => updateBondType(selectedBond.id, "metallic")}
+                    className={`w-full px-3 py-1.5 text-xs font-medium rounded transition-colors text-left ${
+                      selectedBond.bondType === "metallic"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    }`}
+                  >
+                    Metallic Bond
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </DndContext>

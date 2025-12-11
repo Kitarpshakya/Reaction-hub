@@ -118,7 +118,7 @@ export default function CompoundDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6C5CE7]"></div>
       </div>
     );
@@ -126,7 +126,7 @@ export default function CompoundDetailPage() {
 
   if (error || !compound) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-6">⚠️</div>
           <h2 className="text-2xl font-bold text-white mb-4">{error || "Compound not found"}</h2>
@@ -142,7 +142,7 @@ export default function CompoundDetailPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

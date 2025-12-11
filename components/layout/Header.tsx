@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -90,10 +91,12 @@ export default function Header() {
                   className="flex items-center gap-2 px-2.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-all border border-white/10 hover:border-white/20"
                 >
                   {session.user?.image && (
-                    <img
+                    <Image
                       src={session.user.image}
                       alt={session.user.name || "User"}
-                      className="w-7 h-7 rounded-full ring-2 ring-white/20"
+                      width={28}
+                      height={28}
+                      className="rounded-full ring-2 ring-white/20"
                     />
                   )}
                   <span className="text-white/90 text-sm font-medium hidden sm:block">{session.user?.name}</span>
@@ -126,10 +129,12 @@ export default function Header() {
                         <div className="px-4 py-3 border-b border-white/10 bg-white/5">
                           <div className="flex items-center gap-3">
                             {session.user?.image && (
-                              <img
+                              <Image
                                 src={session.user.image}
                                 alt={session.user.name || "User"}
-                                className="w-12 h-12 rounded-full ring-2 ring-white/20"
+                                width={48}
+                                height={48}
+                                className="rounded-full ring-2 ring-white/20"
                               />
                             )}
                             <div className="flex-1 min-w-0">

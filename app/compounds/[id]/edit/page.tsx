@@ -105,7 +105,7 @@ export default function EditCompoundPage() {
 
   if (status === "loading" || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6C5CE7]"></div>
       </div>
     );
@@ -117,7 +117,7 @@ export default function EditCompoundPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-400 text-xl mb-4">{error}</p>
           <Link href="/compounds" className="text-blue-400 hover:text-blue-300 transition-colors">
@@ -129,7 +129,7 @@ export default function EditCompoundPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
       <div className="flex h-[calc(100vh-3.5rem)]">
         {/* Elements Panel - Left */}
         <ElementsPanel />

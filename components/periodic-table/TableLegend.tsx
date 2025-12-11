@@ -45,7 +45,7 @@ export default function TableLegend({ selectedCategory, onCategoryClick }: Table
               }`}
             >
               <div
-                className={`w-3 h-3 md:w-4 md:h-4 rounded-sm border flex-shrink-0 transition-all ${
+                className={`w-3 h-3 md:w-4 md:h-4 rounded-sm border shrink-0 transition-all ${
                   isSelected ? "border-[#6C5CE7] ring-1 ring-[#6C5CE7]" : "border-gray-600"
                 }`}
                 style={{ backgroundColor: CATEGORY_COLORS[category as ElementCategory] }}
