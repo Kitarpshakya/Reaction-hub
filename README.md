@@ -265,9 +265,7 @@ reaction-hub/
 │   └── useAuth.ts                             # Auth state management
 │
 ├── scripts/
-│   ├── seed.js                                # Database seeding script
-│   ├── fix-bond-types.ts                      # Utility script
-│   └── fix-halogen-category.ts                # Utility script
+│   └── seed.js                                # Database seeding script
 │
 ├── styles/
 │   └── periodic-table.css                     # Periodic table custom styles

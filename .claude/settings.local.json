@@ -18,7 +18,9 @@
       "Bash(taskkill:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(rm:*)",
+      "Bash(rmdir:*)"
     ]
   }
 }
