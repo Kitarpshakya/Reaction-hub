@@ -1,0 +1,256 @@
+[
+  {
+    "name": "Benzene",
+    "commonName": "Benzene",
+    "category": "aromatic",
+    "smiles": "c1ccccc1",
+    "molecularFormula": "C₆H₆",
+    "molecularWeight": 78.11,
+    "templateCategory": "benzene-derivatives",
+    "description": "The simplest aromatic hydrocarbon with a hexagonal ring structure",
+    "functionalGroups": ["aromatic ring"],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 100, "y": 50}, "hybridization": "sp2"},
+      {"id": "c2", "element": "C", "position": {"x": 143.3, "y": 75}, "hybridization": "sp2"},
+      {"id": "c3", "element": "C", "position": {"x": 143.3, "y": 125}, "hybridization": "sp2"},
+      {"id": "c4", "element": "C", "position": {"x": 100, "y": 150}, "hybridization": "sp2"},
+      {"id": "c5", "element": "C", "position": {"x": 56.7, "y": 125}, "hybridization": "sp2"},
+      {"id": "c6", "element": "C", "position": {"x": 56.7, "y": 75}, "hybridization": "sp2"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "aromatic"},
+      {"id": "b2", "from": "c2", "to": "c3", "type": "aromatic"},
+      {"id": "b3", "from": "c3", "to": "c4", "type": "aromatic"},
+      {"id": "b4", "from": "c4", "to": "c5", "type": "aromatic"},
+      {"id": "b5", "from": "c5", "to": "c6", "type": "aromatic"},
+      {"id": "b6", "from": "c6", "to": "c1", "type": "aromatic"}
+    ]
+  },
+  {
+    "name": "Methane",
+    "commonName": "Methane",
+    "category": "alkane",
+    "smiles": "C",
+    "molecularFormula": "CH₄",
+    "molecularWeight": 16.04,
+    "templateCategory": "alkanes",
+    "description": "The simplest alkane, a tetrahedral molecule",
+    "functionalGroups": [],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 100, "y": 100}, "hybridization": "sp3"}
+    ],
+    "bonds": []
+  },
+  {
+    "name": "Ethane",
+    "commonName": "Ethane",
+    "category": "alkane",
+    "smiles": "CC",
+    "molecularFormula": "C₂H₆",
+    "molecularWeight": 30.07,
+    "templateCategory": "alkanes",
+    "description": "A simple two-carbon alkane",
+    "functionalGroups": [],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 80, "y": 100}, "hybridization": "sp3"},
+      {"id": "c2", "element": "C", "position": {"x": 130, "y": 100}, "hybridization": "sp3"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "single"}
+    ]
+  },
+  {
+    "name": "Propane",
+    "commonName": "Propane",
+    "category": "alkane",
+    "smiles": "CCC",
+    "molecularFormula": "C₃H₈",
+    "molecularWeight": 44.10,
+    "templateCategory": "alkanes",
+    "description": "A three-carbon straight-chain alkane",
+    "functionalGroups": [],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 60, "y": 100}, "hybridization": "sp3"},
+      {"id": "c2", "element": "C", "position": {"x": 110, "y": 100}, "hybridization": "sp3"},
+      {"id": "c3", "element": "C", "position": {"x": 160, "y": 100}, "hybridization": "sp3"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "single"},
+      {"id": "b2", "from": "c2", "to": "c3", "type": "single"}
+    ]
+  },
+  {
+    "name": "Ethanol",
+    "commonName": "Ethanol",
+    "category": "alcohol",
+    "smiles": "CCO",
+    "molecularFormula": "C₂H₆O",
+    "molecularWeight": 46.07,
+    "templateCategory": "functional-groups",
+    "description": "A simple alcohol, commonly found in beverages",
+    "functionalGroups": ["hydroxyl"],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 60, "y": 100}, "hybridization": "sp3"},
+      {"id": "c2", "element": "C", "position": {"x": 110, "y": 100}, "hybridization": "sp3"},
+      {"id": "o1", "element": "O", "position": {"x": 160, "y": 100}, "hybridization": "sp3"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "single"},
+      {"id": "b2", "from": "c2", "to": "o1", "type": "single"}
+    ]
+  },
+  {
+    "name": "Acetone",
+    "commonName": "Acetone",
+    "category": "ketone",
+    "smiles": "CC(=O)C",
+    "molecularFormula": "C₃H₆O",
+    "molecularWeight": 58.08,
+    "templateCategory": "functional-groups",
+    "description": "A simple ketone, commonly used as a solvent",
+    "functionalGroups": ["carbonyl"],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 60, "y": 120}, "hybridization": "sp3"},
+      {"id": "c2", "element": "C", "position": {"x": 110, "y": 100}, "hybridization": "sp2"},
+      {"id": "o1", "element": "O", "position": {"x": 110, "y": 50}, "hybridization": "sp2"},
+      {"id": "c3", "element": "C", "position": {"x": 160, "y": 120}, "hybridization": "sp3"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "single"},
+      {"id": "b2", "from": "c2", "to": "o1", "type": "double"},
+      {"id": "b3", "from": "c2", "to": "c3", "type": "single"}
+    ]
+  },
+  {
+    "name": "Acetic Acid",
+    "commonName": "Acetic Acid",
+    "category": "carboxylic-acid",
+    "smiles": "CC(=O)O",
+    "molecularFormula": "C₂H₄O₂",
+    "molecularWeight": 60.05,
+    "templateCategory": "functional-groups",
+    "description": "The acid in vinegar",
+    "functionalGroups": ["carboxyl"],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 60, "y": 120}, "hybridization": "sp3"},
+      {"id": "c2", "element": "C", "position": {"x": 110, "y": 100}, "hybridization": "sp2"},
+      {"id": "o1", "element": "O", "position": {"x": 110, "y": 50}, "hybridization": "sp2"},
+      {"id": "o2", "element": "O", "position": {"x": 160, "y": 120}, "hybridization": "sp3"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "single"},
+      {"id": "b2", "from": "c2", "to": "o1", "type": "double"},
+      {"id": "b3", "from": "c2", "to": "o2", "type": "single"}
+    ]
+  },
+  {
+    "name": "Cyclohexane",
+    "commonName": "Cyclohexane",
+    "category": "alkane",
+    "smiles": "C1CCCCC1",
+    "molecularFormula": "C₆H₁₂",
+    "molecularWeight": 84.16,
+    "templateCategory": "cyclic",
+    "description": "A six-membered saturated ring",
+    "functionalGroups": [],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 100, "y": 50}, "hybridization": "sp3"},
+      {"id": "c2", "element": "C", "position": {"x": 143.3, "y": 75}, "hybridization": "sp3"},
+      {"id": "c3", "element": "C", "position": {"x": 143.3, "y": 125}, "hybridization": "sp3"},
+      {"id": "c4", "element": "C", "position": {"x": 100, "y": 150}, "hybridization": "sp3"},
+      {"id": "c5", "element": "C", "position": {"x": 56.7, "y": 125}, "hybridization": "sp3"},
+      {"id": "c6", "element": "C", "position": {"x": 56.7, "y": 75}, "hybridization": "sp3"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "single"},
+      {"id": "b2", "from": "c2", "to": "c3", "type": "single"},
+      {"id": "b3", "from": "c3", "to": "c4", "type": "single"},
+      {"id": "b4", "from": "c4", "to": "c5", "type": "single"},
+      {"id": "b5", "from": "c5", "to": "c6", "type": "single"},
+      {"id": "b6", "from": "c6", "to": "c1", "type": "single"}
+    ]
+  },
+  {
+    "name": "Ethene",
+    "commonName": "Ethylene",
+    "category": "alkene",
+    "smiles": "C=C",
+    "molecularFormula": "C₂H₄",
+    "molecularWeight": 28.05,
+    "templateCategory": "alkanes",
+    "description": "The simplest alkene with a carbon-carbon double bond",
+    "functionalGroups": [],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 80, "y": 100}, "hybridization": "sp2"},
+      {"id": "c2", "element": "C", "position": {"x": 130, "y": 100}, "hybridization": "sp2"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "double"}
+    ]
+  },
+  {
+    "name": "Ethyne",
+    "commonName": "Acetylene",
+    "category": "alkyne",
+    "smiles": "C#C",
+    "molecularFormula": "C₂H₂",
+    "molecularWeight": 26.04,
+    "templateCategory": "alkanes",
+    "description": "The simplest alkyne with a carbon-carbon triple bond",
+    "functionalGroups": [],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 80, "y": 100}, "hybridization": "sp"},
+      {"id": "c2", "element": "C", "position": {"x": 130, "y": 100}, "hybridization": "sp"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "triple"}
+    ]
+  },
+  {
+    "name": "Methylamine",
+    "commonName": "Methylamine",
+    "category": "amine",
+    "smiles": "CN",
+    "molecularFormula": "CH₅N",
+    "molecularWeight": 31.06,
+    "templateCategory": "functional-groups",
+    "description": "A simple primary amine",
+    "functionalGroups": ["amino"],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 80, "y": 100}, "hybridization": "sp3"},
+      {"id": "n1", "element": "N", "position": {"x": 130, "y": 100}, "hybridization": "sp3"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "n1", "type": "single"}
+    ]
+  },
+  {
+    "name": "Toluene",
+    "commonName": "Toluene",
+    "category": "aromatic",
+    "smiles": "Cc1ccccc1",
+    "molecularFormula": "C₇H₈",
+    "molecularWeight": 92.14,
+    "templateCategory": "benzene-derivatives",
+    "description": "Benzene with a methyl substituent",
+    "functionalGroups": ["aromatic ring", "methyl"],
+    "atoms": [
+      {"id": "c1", "element": "C", "position": {"x": 100, "y": 50}, "hybridization": "sp2"},
+      {"id": "c2", "element": "C", "position": {"x": 143.3, "y": 75}, "hybridization": "sp2"},
+      {"id": "c3", "element": "C", "position": {"x": 143.3, "y": 125}, "hybridization": "sp2"},
+      {"id": "c4", "element": "C", "position": {"x": 100, "y": 150}, "hybridization": "sp2"},
+      {"id": "c5", "element": "C", "position": {"x": 56.7, "y": 125}, "hybridization": "sp2"},
+      {"id": "c6", "element": "C", "position": {"x": 56.7, "y": 75}, "hybridization": "sp2"},
+      {"id": "c7", "element": "C", "position": {"x": 100, "y": 10}, "hybridization": "sp3"}
+    ],
+    "bonds": [
+      {"id": "b1", "from": "c1", "to": "c2", "type": "aromatic"},
+      {"id": "b2", "from": "c2", "to": "c3", "type": "aromatic"},
+      {"id": "b3", "from": "c3", "to": "c4", "type": "aromatic"},
+      {"id": "b4", "from": "c4", "to": "c5", "type": "aromatic"},
+      {"id": "b5", "from": "c5", "to": "c6", "type": "aromatic"},
+      {"id": "b6", "from": "c6", "to": "c1", "type": "aromatic"},
+      {"id": "b7", "from": "c1", "to": "c7", "type": "single"}
+    ]
+  }
+]
