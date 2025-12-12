@@ -30,21 +30,6 @@ export default function ElementBubble({
     id,
   });
 
-  // Track if we're currently dragging or just finished dragging
-  const wasDraggingRef = React.useRef(false);
-
-  React.useEffect(() => {
-    if (isDragging) {
-      wasDraggingRef.current = true;
-    } else if (wasDraggingRef.current) {
-      // Just finished dragging - clear flag after a short delay
-      const timeout = setTimeout(() => {
-        wasDraggingRef.current = false;
-      }, 100);
-      return () => clearTimeout(timeout);
-    }
-  }, [isDragging]);
-
   // Debug logging for selected elements
   React.useEffect(() => {
     if (isSelected) {
@@ -81,35 +66,6 @@ export default function ElementBubble({
     onRemove();
   };
 
-  const handleElementClick = (e: React.MouseEvent) => {
-    // Don't trigger click if we're dragging or just finished dragging
-    if (isDragging || wasDraggingRef.current) {
-      console.log("Ignoring click - element was being dragged");
-      return;
-    }
-
-    // Don't trigger if clicking on a button
-    if ((e.target as HTMLElement).closest('button')) {
-      return;
-    }
-
-    e.stopPropagation();
-    console.log("Element clicked (from bubble):", element.symbol);
-    // Always call onSelect - let the parent handle the logic
-    onSelect();
-  };
-
-  // Create custom listeners that check for button clicks
-  const customListeners = {
-    ...listeners,
-    onPointerDown: (e: React.PointerEvent) => {
-      // Don't start dragging if clicking on a button
-      if ((e.target as HTMLElement).closest('button')) {
-        return;
-      }
-      listeners?.onPointerDown?.(e as any);
-    },
-  };
 
   return (
     <div
@@ -117,13 +73,12 @@ export default function ElementBubble({
       style={style}
       className={`rounded-full flex flex-col items-center justify-center transition-all duration-200 ${
         isSelected
-          ? "ring-2 ring-blue-400 shadow-md shadow-blue-400/50 scale-105"
+          ? "ring-4 ring-blue-400 shadow-lg shadow-blue-400/60 scale-110 animate-pulse"
           : isBonded
-          ? "ring-1 shadow-md hover:scale-105 hover:shadow-lg"
-          : "ring-2 ring-dashed ring-yellow-400 shadow-md hover:scale-105 hover:shadow-lg"
+          ? "ring-1 shadow-md hover:scale-105 hover:shadow-lg cursor-pointer"
+          : "ring-2 ring-dashed ring-yellow-400 shadow-md hover:scale-105 hover:shadow-lg cursor-pointer"
       }`}
-      onClick={handleElementClick}
-      {...customListeners}
+      {...listeners}
       {...attributes}
     >
       <div

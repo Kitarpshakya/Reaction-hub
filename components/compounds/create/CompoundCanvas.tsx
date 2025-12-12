@@ -47,8 +47,10 @@ export default function CompoundCanvas() {
     console.log(`Drag end: distance=${dragDistance.toFixed(1)}px, time=${dragTime}ms`);
 
     // If drag distance is very small, treat as click (not drag)
-    if (dragDistance < 5) {
+    if (dragDistance < 10) {
       console.log("Treating as click (minimal drag distance)");
+      // Handle as element selection
+      handleElementSelect(elementId);
       return;
     }
 
@@ -137,10 +139,10 @@ export default function CompoundCanvas() {
             <span className="text-white font-medium text-sm">Auto-Bonding</span>
           </div>
 
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-400 font-medium">
             {selectedElementId
-              ? "Click another element to bond • Element stays selected if more bonds available"
-              : "Click elements in left panel to add • Drag to reposition • Close elements auto-bond • Unbonded elements show yellow ! badge"}
+              ? "✓ Element selected • Click another element to create a bond"
+              : "Click any element to select it, then click another to bond • Or drag close together to auto-bond"}
           </div>
 
           <div className="ml-auto text-xs text-gray-400">
@@ -298,16 +300,26 @@ export default function CompoundCanvas() {
           {/* Instructions */}
           {canvasElements.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center text-gray-500 bg-gray-800 bg-opacity-80 p-8 rounded-xl">
-                <p className="text-xl mb-3">Click elements from left panel to add</p>
-                <div className="text-sm space-y-2">
-                  <p>• Drag elements to reposition</p>
-                  <p>• Place close together (120px) to auto-bond</p>
-                  <p>• Or click one element then another to bond</p>
-                  <p>• Element stays selected if it can form more bonds (e.g., O can bond with 2 H)</p>
-                  <p>• Click bond to select, then click X to break</p>
-                  <p>• Click X on element to remove</p>
-                  <p>• Unbonded elements show yellow ! badge</p>
+              <div className="text-center text-gray-500 bg-gray-800 bg-opacity-80 p-8 rounded-xl max-w-2xl">
+                <p className="text-xl mb-4 text-white">How to Build Compounds</p>
+                <div className="text-sm space-y-3 text-left">
+                  <div>
+                    <p className="font-semibold text-blue-400 mb-1">🖱️ Manual Bonding (Click-to-Bond)</p>
+                    <p>1. Click an element to select it (blue glow appears)</p>
+                    <p>2. Click another element to create a bond</p>
+                    <p>3. Element stays selected if it can bond more (e.g., O has 2 bonds)</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-green-400 mb-1">🎯 Auto-Bonding (Proximity)</p>
+                    <p>• Drag elements close together (~120px) to auto-bond</p>
+                    <p>• Or add elements near existing ones to auto-connect</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-yellow-400 mb-1">⚠️ Tips</p>
+                    <p>• Unbonded elements show yellow "!" badge</p>
+                    <p>• Click bond line, then X to break it</p>
+                    <p>• Click X on element to remove it</p>
+                  </div>
                 </div>
               </div>
             </div>
