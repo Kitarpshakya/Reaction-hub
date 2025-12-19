@@ -19,9 +19,8 @@ export default function OrganicChemistryPage() {
 
   const fetchStructures = async () => {
     try {
-      const url = selectedCategory === "all"
-        ? "/api/organic-structures"
-        : `/api/organic-structures?category=${selectedCategory}`;
+      const url =
+        selectedCategory === "all" ? "/api/organic-structures" : `/api/organic-structures?category=${selectedCategory}`;
 
       const res = await fetch(url);
       if (res.ok) {
@@ -69,15 +68,6 @@ export default function OrganicChemistryPage() {
     <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
-            Organic Chemistry Library
-          </h1>
-          <p className="text-white/60 text-lg">
-            Explore organic molecular structures and their properties
-          </p>
-        </div>
-
         {/* Filters and Controls */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           {/* Search Bar */}
@@ -209,62 +199,61 @@ export default function OrganicChemistryPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.4) }}
-                  className="group bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#6C5CE7]/50 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:shadow-[#6C5CE7]/10"
+                  className="group bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-[#00D9FF]/50 transition-all cursor-pointer hover:shadow-lg hover:shadow-[#00D9FF]/10 relative"
                 >
-                  {/* Structure Name */}
-                  <h3 className="text-xl font-bold text-white mb-1">{structure.name}</h3>
-
-                  {/* Common Name */}
-                  {structure.commonName && structure.commonName !== structure.name && (
-                    <p className="text-sm text-white/50 mb-3">({structure.commonName})</p>
-                  )}
-
-                  {/* Molecular Formula */}
-                  <p className="text-2xl font-mono text-[#6C5CE7] mb-4">{structure.molecularFormula}</p>
-
-                  {/* Properties */}
-                  <div className="space-y-2 text-sm">
-                    <p className="text-white/60">
-                      <span className="text-white/40">Category:</span>{" "}
-                      <span className="capitalize">{structure.category.replace("-", " ")}</span>
-                    </p>
-                    <p className="text-white/60">
-                      <span className="text-white/40">Molecular Weight:</span> {structure.molecularWeight.toFixed(2)} g/mol
-                    </p>
-                    {structure.smiles && (
-                      <p className="text-white/40 text-xs font-mono truncate">
-                        SMILES: {structure.smiles}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Functional Groups */}
-                  {structure.functionalGroups && structure.functionalGroups.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {structure.functionalGroups.slice(0, 3).map((fg, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-1 bg-white/10 text-white/60 text-xs rounded-lg"
-                        >
-                          {fg.name}
-                        </span>
-                      ))}
-                      {structure.functionalGroups.length > 3 && (
-                        <span className="px-2 py-1 bg-white/10 text-white/60 text-xs rounded-lg">
-                          +{structure.functionalGroups.length - 3} more
+                  {/* Category Badge - Top */}
+                  <div className="px-6 pt-4 pb-2 border-b border-white/5">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-block px-3 py-1 bg-[#00D9FF]/20 text-[#00D9FF] text-xs font-semibold rounded-full capitalize">
+                        {structure.category.replace("-", " ")}
+                      </span>
+                      {structure.isTemplate && (
+                        <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-full">
+                          Template
                         </span>
                       )}
                     </div>
-                  )}
+                  </div>
 
-                  {/* Template Badge */}
-                  {structure.isTemplate && (
-                    <div className="mt-4">
-                      <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-lg">
-                        Template
-                      </span>
+                  <div className="p-6 py-4">
+                    {/* Name */}
+                    <h3 className="text-xl font-bold text-white mb-1 line-clamp-1 group-hover:text-[#00D9FF] transition-colors">
+                      {structure.name}
+                    </h3>
+
+                    {/* IUPAC/Common Name */}
+                    {structure.iupacName && (
+                      <p className="text-xs text-white/50 mb-3 italic line-clamp-1">{structure.iupacName}</p>
+                    )}
+                    {!structure.iupacName && structure.commonName && structure.commonName !== structure.name && (
+                      <p className="text-xs text-white/50 mb-3 italic line-clamp-1">{structure.commonName}</p>
+                    )}
+
+                    {/* Molecular Formula - Highlighted */}
+                    <div className="bg-[#00D9FF]/10 border border-[#00D9FF]/30 rounded-lg px-4 py-3 mb-4">
+                      <p className="text-2xl font-mono font-bold text-[#00D9FF] text-center tracking-wide">
+                        {structure.molecularFormula}
+                      </p>
                     </div>
-                  )}
+
+                    {/* Properties Grid */}
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between py-2 border-b border-white/5">
+                        <span className="text-white/40">Molecular Weight</span>
+                        <span className="text-white/80 font-medium">{structure.molecularWeight.toFixed(2)} g/mol</span>
+                      </div>
+                      {structure.smiles && (
+                        <div className="py-2 border-white/5">
+                          <p className="text-white/40 text-xs font-mono truncate">
+                            <span className="text-white/30">SMILES:</span> {structure.smiles}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Hover Indicator */}
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#00D9FF] to-[#6C5CE7] opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </motion.div>
               </Link>
             ))}

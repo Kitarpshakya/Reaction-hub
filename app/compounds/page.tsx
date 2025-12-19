@@ -162,23 +162,39 @@ export default function CompoundsPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredCompounds.map((compound, index) => (
               <Link key={compound.id} href={`/compounds/${compound.id}`}>
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.3) }}
-                  className="group bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#6C5CE7]/50 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:shadow-[#6C5CE7]/10"
+                  className="group bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-[#6C5CE7]/50 transition-all cursor-pointer hover:shadow-lg hover:shadow-[#6C5CE7]/10 relative"
                 >
-                  <h3 className="text-2xl font-bold text-white mb-2">{compound.name}</h3>
-                  <p className="text-3xl font-mono text-[#6C5CE7] mb-4">{compound.formula}</p>
-                  <div className="space-y-2 text-sm">
-                    <p className="text-white/60">
-                      <span className="text-white/40">Molar Mass:</span> {compound.molarMass.toFixed(3)} g/mol
-                    </p>
-                    {compound.description && <p className="text-white/60 line-clamp-2">{compound.description}</p>}
+                  <div className="p-6">
+                    {/* Name */}
+                    <h3 className="text-xl font-bold text-white mb-3 line-clamp-1 group-hover:text-[#6C5CE7] transition-colors">
+                      {compound.name}
+                    </h3>
+
+                    {/* Chemical Formula - Highlighted */}
+                    <div className="bg-[#6C5CE7]/10 border border-[#6C5CE7]/30 rounded-lg px-4 py-3 mb-4">
+                      <p className="text-2xl font-mono font-bold text-[#6C5CE7] text-center tracking-wide">
+                        {compound.formula}
+                      </p>
+                    </div>
+
+                    {/* Properties Grid */}
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between py-2 border-b border-white/5">
+                        <span className="text-white/40">Molar Mass</span>
+                        <span className="text-white/80 font-medium">{compound.molarMass.toFixed(3)} g/mol</span>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Hover Indicator */}
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#6C5CE7] to-[#A855F7] opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </motion.div>
               </Link>
             ))}

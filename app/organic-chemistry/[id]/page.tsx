@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useModal } from "@/lib/contexts/ModalContext";
 import { OrganicStructure } from "@/lib/types/organic";
 import MoleculeViewer from "@/components/organic/MoleculeViewer";
 
@@ -12,6 +13,7 @@ export default function OrganicStructureDetailPage() {
   const { data: session } = useSession();
   const params = useParams();
   const router = useRouter();
+  const { showConfirm, showError } = useModal();
   const [structure, setStructure] = useState<OrganicStructure | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,28 +43,33 @@ export default function OrganicStructureDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!structure || !confirm("Are you sure you want to delete this structure?")) {
-      return;
-    }
+    if (!structure) return;
 
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/organic-structures/${structure.id || structure._id}`, {
-        method: "DELETE",
-      });
+    showConfirm(
+      "Are you sure you want to delete this structure? This action cannot be undone.",
+      async () => {
+        setDeleting(true);
+        try {
+          const res = await fetch(`/api/organic-structures/${structure.id || structure._id}`, {
+            method: "DELETE",
+          });
 
-      if (res.ok) {
-        router.push("/organic-chemistry");
-      } else {
-        const data = await res.json();
-        alert(data.error || "Failed to delete structure");
-      }
-    } catch (error) {
-      console.error("Error deleting structure:", error);
-      alert("Failed to delete structure");
-    } finally {
-      setDeleting(false);
-    }
+          if (res.ok) {
+            router.push("/organic-chemistry");
+          } else {
+            const data = await res.json();
+            showError(data.error || "Failed to delete structure");
+          }
+        } catch (error) {
+          console.error("Error deleting structure:", error);
+          showError("Failed to delete structure");
+        } finally {
+          setDeleting(false);
+        }
+      },
+      "Delete Structure",
+      "Delete"
+    );
   };
 
   if (loading) {

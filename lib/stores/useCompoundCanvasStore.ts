@@ -12,6 +12,7 @@ import {
   shouldAutoGroup,
   getAvailableValence,
 } from "@/lib/utils/chemistry-helpers";
+import { modalService } from "@/lib/utils/modal-service";
 
 interface CanvasElement extends CompoundElement {
   id: string; // Unique instance ID
@@ -225,13 +226,14 @@ export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => 
             `❌ Cannot create separate compound! ${fromElement.element.symbol} and ${toElement.element.symbol} ` +
               `are not connected to the existing compound. Please bond to existing compound elements first.`
           );
-          alert(
+          modalService.showAlert(
             `Cannot create separate compound!\n\n` +
               `You can only create ONE compound at a time. ` +
               `At least one element must be part of the existing compound.\n\n` +
               `Either:\n` +
               `- Bond ${fromElement.element.symbol} or ${toElement.element.symbol} to the existing compound first\n` +
-              `- Use the Clear/Reset button to start a new compound`
+              `- Use the Clear/Reset button to start a new compound`,
+            "Cannot Create Separate Compound"
           );
           return state;
         }
@@ -246,10 +248,11 @@ export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => 
             `❌ Cannot merge separate groups! ${fromElement.element.symbol} (group ${fromElement.groupId}) ` +
               `and ${toElement.element.symbol} (group ${toElement.groupId}) are in different compounds.`
           );
-          alert(
+          modalService.showAlert(
             `Cannot merge separate compounds!\n\n` +
               `These elements belong to different compound groups. ` +
-              `This should not happen in the single-compound mode.`
+              `This should not happen in the single-compound mode.`,
+            "Cannot Merge Compounds"
           );
           return state;
         }

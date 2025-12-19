@@ -510,6 +510,15 @@ export function validateStructure(atoms: Atom[], bonds: Bond[]): {
     bondCounts.set(bond.to, (bondCounts.get(bond.to) || 0) + count);
   });
 
+  // Count element occurrences for better error messages
+  const elementCounts = new Map<string, number>();
+  const elementIndices = new Map<string, number>();
+
+  atoms.forEach(atom => {
+    const count = (elementCounts.get(atom.element) || 0) + 1;
+    elementCounts.set(atom.element, count);
+  });
+
   atoms.forEach(atom => {
     const usedBonds = bondCounts.get(atom.id) || 0;
 
@@ -521,8 +530,27 @@ export function validateStructure(atoms: Atom[], bonds: Bond[]): {
 
     const max = maxValency[atom.element];
     if (max !== undefined && usedBonds > max) {
+      // Create user-friendly element identifier
+      const elementCount = elementCounts.get(atom.element) || 1;
+      let elementLabel = atom.element;
+
+      if (elementCount > 1) {
+        // Multiple of same element - add index
+        const currentIndex = (elementIndices.get(atom.element) || 0) + 1;
+        elementIndices.set(atom.element, currentIndex);
+        elementLabel = `${atom.element} atom #${currentIndex}`;
+      } else {
+        // Only one of this element
+        const elementNames: Record<string, string> = {
+          'H': 'Hydrogen', 'C': 'Carbon', 'O': 'Oxygen', 'N': 'Nitrogen', 'S': 'Sulfur',
+          'P': 'Phosphorus', 'F': 'Fluorine', 'Cl': 'Chlorine',
+          'Br': 'Bromine', 'I': 'Iodine'
+        };
+        elementLabel = elementNames[atom.element] || atom.element;
+      }
+
       errors.push(
-        `${atom.element} (${atom.id}) exceeds maximum valency: ${usedBonds} > ${max}`
+        `${elementLabel} has too many bonds (${usedBonds} bonds, maximum ${max})`
       );
     }
   });

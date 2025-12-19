@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bond } from "@/lib/types/compound";
+import { Bond, BondType } from "@/lib/types/compound";
 
 interface BondConnectorProps {
   bond: Bond;

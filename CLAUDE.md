@@ -8,7 +8,7 @@ Interactive periodic table and compound management app with 3D visualizations, i
 - Element detail pages with 3D Bohr model visualizations
 - Compound browsing (public) and creation (auth required)
 - Phase 3: Drag-drop compound builder with smart bonding, valency validation, element repositioning
-- Phase 9: Organic Chemistry library with common structures (benzene, functional groups), 2D structure visualization
+- Phase 9: Organic Chemistry builder with template-seed system, carbon graph editing, structural modification
 
 **Tech Stack:** Next.js 15, TypeScript, React 19, Tailwind CSS, Framer Motion, Three.js, MongoDB, NextAuth.js, @dnd-kit/core, RDKit.js (for structure rendering)
 
@@ -101,59 +101,80 @@ interface Compound {
   createdBy: string; createdByName: string; createdAt: Date; updatedAt: Date;
 }
 
-// Phase 9: Organic Chemistry
+// Phase 9: Organic Chemistry (Template-Seed + Structural Modification System)
 interface OrganicStructure {
-  id: string; name: string; iupacName?: string; commonName?: string;
-  category: "alkane" | "alkene" | "alkyne" | "aromatic" | "alcohol" | "aldehyde" | "ketone" |
-    "carboxylic-acid" | "ester" | "ether" | "amine" | "amide" | "halide" | "custom";
+  id: string;
+  name: string;
+  iupacName?: string;
+  commonName?: string;
 
-  // Structure representation
-  smiles: string; // Simplified Molecular Input Line Entry System
-  molFile?: string; // MDL Molfile format (for 2D/3D rendering)
-  inchi?: string; // International Chemical Identifier
+  // Template origin (seed used to start construction)
+  originTemplate?: {
+    type: "alkane-chain" | "alkene-chain" | "alkyne-chain" | "fatty-acid" | "alcohol" |
+          "aromatic-ring" | "cycloalkane" | "carbonyl" | "none";
+    initialParams?: { chainLength?: number; ringSize?: number };
+  };
 
-  // Atoms and bonds (similar to Compound but with organic-specific features)
-  atoms: {
-    id: string; element: string; charge?: number; radical?: boolean;
-    position: { x: number; y: number; z?: number }; // 2D or 3D coordinates
-    hybridization?: "sp" | "sp2" | "sp3"; // Orbital hybridization
-  }[];
+  // Carbon graph structure (primary representation)
+  carbonGraph: {
+    nodes: {
+      id: string; // unique node identifier
+      element: "C" | "O" | "N" | "S" | "P" | "F" | "Cl" | "Br" | "I"; // organic elements only
+      position: { x: number; y: number }; // 2D skeletal coordinates
+      hybridization: "sp" | "sp2" | "sp3"; // auto-calculated from bonds
+      implicitHydrogens: number; // auto-calculated to satisfy valency
+    }[];
 
-  bonds: {
-    id: string; from: string; to: string;
-    type: "single" | "double" | "triple" | "aromatic" | "dative";
-    stereo?: "wedge" | "dash" | "wavy"; // Stereochemistry indicators
-  }[];
+    edges: {
+      id: string;
+      from: string; // node id
+      to: string; // node id
+      bondOrder: 1 | 2 | 3; // single, double, triple
+      bondType: "sigma" | "pi-system" | "aromatic"; // aromatic for benzene resonance
+      stereo?: "wedge" | "dash" | "wavy"; // 3D stereochemistry representation
+    }[];
+  };
 
-  // Functional groups present
+  // Functional groups (detected subgraphs)
   functionalGroups: {
-    name: string; // "hydroxyl", "carbonyl", "amino", etc.
-    position: number[]; // Atom indices
+    name: "hydroxyl" | "carbonyl" | "carboxyl" | "amino" | "nitro" | "alkyl-halide" |
+          "ester" | "ether" | "amide" | "nitrile" | "aldehyde" | "ketone";
+    nodeIds: string[]; // carbon graph nodes that form this group
+    attachmentPoint: string; // primary carbon node where group attaches
   }[];
 
-  // Chemical properties
-  molecularFormula: string; // C₆H₁₂O₆
-  molecularWeight: number; // g/mol
-  logP?: number; // Lipophilicity (partition coefficient)
-  pKa?: number; // Acidity constant
+  // Derived properties (auto-calculated from carbonGraph)
+  derived: {
+    molecularFormula: string; // Hill notation: CₓHᵧOᵤNᵥ...
+    molecularWeight: number; // g/mol
+    totalAtoms: number;
+    carbonCount: number;
+    unsaturationDegree?: number; // rings + double bonds + 2×triple bonds
+    smiles?: string; // generated SMILES string
+  };
 
-  // Template information (for predefined structures)
-  isTemplate: boolean;
-  templateCategory?: "benzene-derivatives" | "alkanes" | "cyclic" | "functional-groups";
+  // Validation state
+  validation: {
+    isValid: boolean;
+    errors: string[]; // "Carbon node C5 exceeds valency (5 bonds)"
+    warnings: string[]; // "Unusual bond angle detected at C3"
+  };
 
-  // Visual rendering data
-  renderData?: {
-    bondLength: number; // Standard bond length in pixels
-    angle: number; // Standard bond angle (120° for benzene, 109.5° for sp3)
-    showHydrogens: boolean; // Display implicit hydrogens
-    colorScheme: "cpk" | "element" | "custom"; // CPK coloring, element-based, or custom
+  // Visual rendering preferences
+  renderSettings: {
+    showHydrogens: boolean; // display implicit H atoms
+    showCarbonLabels: boolean; // show 'C' labels in skeletal formula
+    bondLength: number; // pixels
+    colorScheme: "cpk" | "monochrome"; // CPK or black/white
   };
 
   // User metadata
-  createdBy: string; createdByName: string;
-  isPublic: boolean; // Can other users view this structure
-  tags?: string[]; // For categorization and search
-  createdAt: Date; updatedAt: Date;
+  createdBy: string;
+  createdByName: string;
+  isPublic: boolean;
+  tags?: string[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -183,34 +204,90 @@ interface OrganicStructure {
 - "Create Structure" button (auth required)
 - Template browser (benzene, cyclohexane, common functional groups)
 
-**Create Organic Structure (Phase 9):** Advanced organic molecule builder
+**Create Organic Structure (Phase 9):** Template-Seed + Structural Modification Builder
 
 **Layout:**
-- Left panel: Templates and building blocks
-  - Common structures: Benzene, Cyclohexane, Naphthalene, etc.
-  - Functional groups: -OH, -COOH, -NH₂, -CHO, -CO-, -X (halogens)
-  - Carbon chains: Linear (C1-C20), branched, cyclic
-  - Quick insert buttons
-- Center canvas: 2D structure editor
-  - Click-to-place atoms (C, H, O, N, S, P, halogens)
-  - Click-to-bond (single, double, triple, aromatic)
-  - Drag to adjust bond angles
-  - Automatic hybridization detection (sp, sp2, sp3)
-  - Show/hide hydrogens toggle
-  - Stereochemistry tools (wedge, dash bonds for chirality)
-  - Ring templates (3-8 membered rings)
-- Right panel: Structure properties
-  - Molecular formula (auto-calculated)
-  - Molecular weight (auto-calculated)
-  - SMILES notation (auto-generated)
-  - Functional groups detected
-  - IUPAC name suggestions (if possible)
-  - 3D preview (optional, using Three.js)
-- Bottom: Save structure, export options (PNG, SVG, MOL file)
+- Left panel: Template Seeds (NOT final molecules)
+  - **Structural Scaffolds:**
+    - Alkane Chain (C₁-C₂₀) - linear carbon skeleton
+    - Alkene Chain - with one C=C, position editable
+    - Alkyne Chain - with one C≡C, position editable
+    - Fatty Acid Backbone - HOOC-(CH₂)ₙ-CH₃, n editable
+    - Alcohol Skeleton - (CH₂)ₙ-OH, n editable
+    - Aromatic Ring - benzene ring (C₆)
+    - Cycloalkane - saturated ring (C₃-C₈)
+    - Carbonyl Backbone - C=O with editable attachments
+  - Each template is a STARTING POINT, not a final structure
+  - Templates initialize carbon graph, user modifies after
 
-**Workflow:** Select template OR build from scratch → place atoms → create bonds → add functional groups → adjust stereochemistry → validate structure → name → save
+- Center canvas: Carbon Graph Editor
+  - **Primary structure (carbon skeleton):**
+    - Carbon nodes connected by bonds
+    - Click carbon node to select
+    - Click bond to change order (single ⇄ double ⇄ triple)
+  - **Modification tools:**
+    - **Extend**: Add carbon to terminal position
+    - **Shorten**: Remove terminal carbon
+    - **Branch**: Add carbon branch at selected node
+    - **Cyclize**: Connect two nodes to form ring
+    - **Unsaturate**: Insert double/triple bond
+    - **Saturate**: Remove double/triple bond
+  - **Functional group attachment:**
+    - Select carbon node → attach -OH, -COOH, -NH₂, -NO₂, -X (halogen)
+    - Groups replace implicit hydrogens
+    - Cannot exceed carbon valency (max 4 bonds)
+  - **Real-time validation:**
+    - Valency counter on each carbon node (e.g., "3/4")
+    - Red highlight if valency exceeded
+    - Implicit H count auto-adjusts
+  - **Visual feedback:**
+    - Skeletal formula rendering (carbons at vertices)
+    - Show/hide implicit hydrogens toggle
+    - Bond angles auto-adjust (sp³: 109.5°, sp²: 120°, sp: 180°)
 
-**Tech:** Canvas API or SVG for 2D drawing, RDKit.js (or similar) for SMILES generation and validation, Three.js for optional 3D preview
+- Right panel: Derived Properties (Auto-calculated)
+  - Molecular formula (Hill notation: CₓHᵧ...)
+  - Molecular weight (g/mol)
+  - Carbon count
+  - Functional groups detected (auto-identified)
+  - Unsaturation degree
+  - Valency validation status
+  - SMILES string (if valid)
+
+- Bottom: Save structure, clear canvas, undo/redo
+
+**Workflow:**
+1. Select template seed (e.g., "Fatty Acid")
+2. Modify carbon skeleton (extend chain, add branches, add double bonds)
+3. Attach functional groups (e.g., add -OH to create hydroxy fatty acid)
+4. Validate structure (all valencies satisfied)
+5. Name structure
+6. Save
+
+**Example Workflows:**
+
+*Building Fatty Acids from "Fatty Acid" Template:*
+- Template: "Fatty Acid" → HOOC-(CH₂)₁₆-CH₃ (default 16-carbon chain)
+- Extend chain: Add 2 carbons → HOOC-(CH₂)₁₈-CH₃ (stearic acid, C₁₈H₃₆O₂)
+- Add double bond: At C9-C10 → HOOC-(CH₂)₇-CH=CH-(CH₂)₇-CH₃ (oleic acid, C₁₈H₃₄O₂)
+- Add 2nd double bond: At C12-C13 → HOOC-(CH₂)₇-CH=CH-CH₂-CH=CH-(CH₂)₄-CH₃ (linoleic acid, C₁₈H₃₂O₂)
+- Add -OH group: At C12 → HOOC-(CH₂)₁₀-CHOH-(CH₂)₅-CH₃ (ricinoleic acid, C₁₈H₃₄O₃)
+
+*Building Aromatics from "Aromatic Ring" Template:*
+- Template: "Aromatic Ring" → Benzene (C₆H₆)
+- Attach -CH₃: At C1 → Toluene (C₇H₈)
+- Attach -OH: At C1 → Phenol (C₆H₆O)
+- Attach -NH₂: At C1 → Aniline (C₆H₇N)
+- Attach -NO₂: At C1 → Nitrobenzene (C₆H₅NO₂)
+- Multi-substitute: -OH at C1, -COOH at C2 → Salicylic acid (C₇H₆O₃)
+
+*Building Alcohols from "Alkane Chain" Template:*
+- Template: "Alkane Chain" (C₃) → Propane (C₃H₈)
+- Attach -OH: At C2 → Isopropanol (C₃H₈O)
+- Branch: Add -CH₃ at C2 → 2-methylpropane (C₄H₁₀)
+- Attach -OH: At C2 of branched → tert-butanol (C₄H₁₀O)
+
+---
 
 **Layout:**
 - Left: Searchable elements panel (118 draggable element cards)
@@ -241,49 +318,333 @@ interface OrganicStructure {
 
 **Logic:** Check diatomic (O→double, N→triple), EN difference (>1.7→ionic), default→single
 
-## Organic Chemistry Features (Phase 9)
+## Organic Chemistry Builder - Canonical Specification (Phase 9)
 
-**Structure Categories:**
-- **Hydrocarbons**: Alkanes (C-C single), Alkenes (C=C double), Alkynes (C≡C triple), Aromatic (benzene rings)
-- **Oxygen-containing**: Alcohols (-OH), Aldehydes (-CHO), Ketones (C=O), Carboxylic acids (-COOH), Esters (-COO-), Ethers (C-O-C)
-- **Nitrogen-containing**: Amines (-NH₂, -NH-, -N<), Amides (-CONH₂), Nitriles (-CN)
-- **Halogen-containing**: Alkyl halides (C-X where X = F, Cl, Br, I)
-- **Custom**: User-created structures
+### Core Philosophy (Non-Negotiable)
 
-**Predefined Templates:**
-- **Benzene ring** (C₆H₆) - 6-membered aromatic ring with alternating double bonds
-- **Cyclohexane** (C₆H₁₂) - 6-membered saturated ring (chair/boat conformations)
-- **Naphthalene** - Fused benzene rings
-- **Common functional groups**: Hydroxyl, Carbonyl, Carboxyl, Amino, Methyl, Ethyl, Phenyl
-- **Linear alkanes**: Methane (CH₄), Ethane (C₂H₆), Propane (C₃H₈), up to C₂₀
-- **Common pharmaceuticals**: Aspirin, Caffeine, Ibuprofen (as examples)
+**THIS SYSTEM IS NOT:**
+- A molecule template selector
+- A functional-group sticker tool
+- A linear chain decorator
 
-**Bonding Rules (Organic-specific):**
-- Carbon: 4 bonds (tetrahedral sp3, trigonal sp2, linear sp)
-- Oxygen: 2 bonds (bent sp3 or linear sp2)
-- Nitrogen: 3 bonds (pyramidal sp3 or trigonal sp2)
-- Hydrogen: 1 bond
-- Aromatic resonance: Benzene bonds shown as circle inside ring or alternating single/double
+**THIS SYSTEM IS:**
+- A **carbon-skeleton graph editor**
+- Based on **organic chemistry topology**
+- Where **all properties are derived, never stored**
 
-**Structure Validation:**
-- Valency checking (ensure all atoms have correct bond count)
-- Aromaticity detection (Hückel's rule: 4n+2 π electrons)
-- Stereochemistry validation (chiral centers marked with wedge/dash bonds)
-- SMILES generation to verify structure is chemically valid
+### Two-Step User Model
 
-**Rendering Options:**
-- **2D Skeletal Formula**: Standard organic chemistry representation (no C labels, implicit H)
-- **2D Full Structure**: Show all atoms including carbons and hydrogens
-- **3D Ball-and-Stick**: Three.js 3D view with rotatable molecule
-- **Space-Filling**: van der Waals radii representation
+#### Step 1: Template Seed (NOT a Molecule)
 
-**Search & Filters:**
-- By name (IUPAC, common name)
-- By functional groups (structures containing -OH, -COOH, etc.)
-- By molecular formula (C₆H₁₂O₆)
-- By category (alkane, aromatic, etc.)
-- By molecular weight range
-- By creator (my structures, public structures)
+Templates are **INITIAL GRAPH SEEDS**, not final molecules.
+
+A template defines:
+- Initial carbon topology
+- Mandatory functional backbone (if any)
+- Allowed mutation space
+
+**Templates DO NOT:**
+- Lock the molecule
+- Prevent future mutations
+- Define final formula
+
+**Example:**
+- "Fatty Acid" template ≠ one specific fatty acid
+- It is: **HOOC-(CH₂)ₙ-CH₃** where **n is editable**
+- Creates initial graph structure
+- User mutates topology to build: palmitic acid, stearic acid, oleic acid, linoleic acid, etc.
+
+#### Step 2: Structural Mutation
+
+User edits the molecule by modifying the **GRAPH**.
+
+Operations mutate topology:
+- Extend chain
+- Shorten chain
+- Branch carbon
+- Cyclize
+- Change bond order
+- Replace substituent
+- Oxidize/reduce carbon
+
+**NO operation attaches labels.**
+**EVERY operation rewires atoms and bonds.**
+
+### Template Catalog (Graph Seeds)
+
+**Alkane Chain**
+- Creates N carbon nodes, all single-bonded
+- Length variable (1-20 carbons)
+
+**Alkene Chain**
+- Same as alkane, with ONE C=C bond
+- Bond position is mutable
+
+**Alkyne Chain**
+- Same as alkane, with ONE C≡C bond
+- Bond position is mutable
+
+**Fatty Acid**
+- HOOC-(CH₂)ₙ-CH₃
+- Includes REQUIRED carboxyl carbon
+- Chain length variable
+
+**Aromatic Ring**
+- Benzene ring graph (6 carbons, alternating bonds)
+- Ring carbons locked as aromatic
+
+**Cycloalkane**
+- Saturated ring (C₃-C₈)
+- Ring size variable
+
+**Blank Canvas**
+- Start with single carbon, build from scratch
+
+### Structural Modification Rules
+
+**Carbon Skeleton Operations:**
+
+1. **Extend**
+   - Add carbon atom to any terminal position
+   - New carbon starts with single bond, valency 1/4
+   - User can then add more bonds or functional groups
+
+2. **Shorten**
+   - Remove terminal carbon atom
+   - Only valid if carbon has ≤1 bond to skeleton
+   - Cannot remove if it would break ring or create isolated fragment
+
+3. **Branch**
+   - Add carbon branch at any non-terminal carbon
+   - Branch carbon connects with single bond
+   - Validates that parent carbon does not exceed valency 4
+
+4. **Cyclize**
+   - Connect two non-adjacent carbon atoms to form ring
+   - Valid ring sizes: 3-8 carbons (common), 9+ (strained, show warning)
+   - Cannot cyclize if either carbon exceeds valency 4
+
+5. **Unsaturate**
+   - Convert C-C single bond → C=C double bond
+   - Convert C=C double bond → C≡C triple bond
+   - Validates valency does not exceed 4 on either carbon
+   - Adjusts implicit hydrogen count automatically
+
+6. **Saturate**
+   - Convert C≡C triple bond → C=C double bond
+   - Convert C=C double bond → C-C single bond
+   - Adds implicit hydrogens to satisfy valency
+
+**Substituent Attachment Operations:**
+
+**CRITICAL: Functional groups are NOT stored. They are DETECTED.**
+
+When attaching a substituent, the system:
+1. Adds heteroatom nodes to the graph
+2. Creates bonds between carbon and heteroatoms
+3. Recalculates implicit hydrogens
+4. Re-detects functional groups from graph topology
+
+**Available Substituent Patterns:**
+
+- **Hydroxyl (-OH)**: Adds O node with single bond to C
+- **Carbonyl (=O)**: Adds O node with double bond to C
+- **Amino (-NH₂)**: Adds N node with single bond to C
+- **Nitro (-NO₂)**: Adds N node + 2 O nodes with appropriate bonds
+- **Halogen (-X)**: Adds F/Cl/Br/I node with single bond to C
+
+**Operation Constraints:**
+- Can only attach if carbon has available valency
+- Operation is rejected if valency exceeded
+- After attachment, functional group is DETECTED, not stored
+
+### Chemical Model (Mandatory)
+
+**Molecule = Graph**
+
+- Atom = Node
+- Bond = Edge with order (1, 2, 3)
+- Hydrogens are implicit
+- Carbon valence = 4
+- Oxygen valence = 2
+- Nitrogen valence = 3
+- Halogens = 1
+
+**If a mutation violates valence: operation is REJECTED**
+
+| Element | Max Valence | Allowed Bond Configurations |
+|---------|-------------|----------------------------|
+| C       | 4           | 4 single, OR 1 double + 2 single, OR 1 triple + 1 single, OR 2 double |
+| O       | 2           | 1 double, OR 2 single |
+| N       | 3           | 3 single, OR 1 double + 1 single, OR 1 triple |
+| S       | 2, 4, 6     | 2 single, OR 1 double, OR 4 single, OR 6 single |
+| P       | 3, 5        | 3 single, OR 5 single |
+| F, Cl, Br, I | 1    | 1 single (terminal only) |
+| H       | 1           | 1 single (implicit) |
+
+**Validation Enforcement:**
+- If mutation exceeds valency → operation rejected
+- No "invalid but accepted" states allowed
+- Implicit hydrogens auto-adjust after every mutation
+- Real-time valency display: "3/4" (bonds used / max valence)
+
+### Hydrogen Handling
+
+**Implicit Hydrogen Principle:**
+
+- Hydrogens are **NOT** explicit nodes in the carbon graph
+- Hydrogen count is **auto-calculated** to satisfy valency
+- Formula: `H_count = max_valency - explicit_bonds`
+
+**Examples:**
+- Carbon with 2 single bonds → 2 implicit H → CH₂
+- Carbon with 1 double bond + 1 single bond → 1 implicit H → CH
+- Carbon with 4 bonds → 0 implicit H → C (quaternary carbon)
+- Oxygen with 1 single bond → 1 implicit H → OH
+- Nitrogen with 2 single bonds → 1 implicit H → NH
+
+**Display Options:**
+- **Skeletal formula (default)**: Hide carbons, hide hydrogens, show heteroatoms
+- **Show hydrogens**: Display implicit H count as subscript (e.g., CH₃, CH₂, NH₂)
+- **Full structure**: Show all atoms including carbon labels
+
+### Derived Data (Read-Only)
+
+**These are ALWAYS computed from the graph:**
+
+- **Molecular Formula**: Calculated by traversing nodes, counting atoms, summing implicit H
+- **Molecular Weight**: Sum of atomic weights (explicit atoms + implicit H)
+- **Functional Group List**: Pattern-matched subgraphs
+- **Saturation Level**: Degree of unsaturation = rings + double bonds + 2×triple bonds
+- **Validity**: Boolean result of valency checking
+
+**Formula Generation Algorithm:**
+1. Traverse all nodes in graph
+2. Count explicit atoms by element
+3. For each node, calculate implicit H: `H = max_valency - sum(bond_orders)`
+4. Sum all implicit H
+5. Format in Hill notation: C, H, then alphabetical
+
+**Example Derivation:**
+```
+Graph: C-C-C-OH
+Nodes: C1, C2, C3, O1
+Edges: C1-C2 (order 1), C2-C3 (order 1), C3-O1 (order 1)
+
+Implicit H calculation:
+- C1: 4 - 1 = 3 H
+- C2: 4 - 2 = 2 H
+- C3: 4 - 2 = 2 H
+- O1: 2 - 1 = 1 H
+
+Formula: C₃H₈O (propanol)
+```
+
+### Aromaticity Rules
+
+**Benzene Resonance:**
+
+- Aromatic rings (benzene) have special bond type: `bondType: "aromatic"`
+- Displayed as circle inside hexagon OR alternating single/double bonds
+- All ring carbons are sp² hybridized
+- Each carbon contributes 1 π electron (total 6 π electrons)
+- Satisfies Hückel's rule: 4n+2 π electrons (n=1)
+
+**Aromatic Template Behavior:**
+- Benzene template locks ring as aromatic
+- Cannot convert aromatic bonds to single bonds (would break aromaticity)
+- Can attach substituents to ring carbons (e.g., -OH → phenol, -CH₃ → toluene)
+- Functional groups replace one implicit H per carbon
+
+### Functional Group Detection (Critical)
+
+**FUNCTIONAL GROUPS ARE NOT STORED. THEY ARE DETECTED.**
+
+A functional group exists **ONLY IF** its atom pattern exists in the graph.
+
+**Detection Algorithm:**
+
+The system scans the graph for known subgraph patterns:
+
+- **Alcohol**: C-O-H pattern (oxygen with 1 carbon bond, 1 implicit H)
+- **Carbonyl**: C=O pattern (oxygen with 1 double bond to carbon)
+- **Carboxylic Acid**: C(=O)-O-H pattern (carbonyl + hydroxyl on same carbon)
+- **Amine**: C-N pattern with 2 implicit H on N
+- **Ester**: C(=O)-O-C pattern (carbonyl with O bridge to another carbon)
+- **Ether**: C-O-C pattern (oxygen bridging two carbons, no carbonyl)
+- **Aldehyde**: Terminal C=O pattern (carbonyl on terminal carbon)
+- **Ketone**: Internal C=O pattern (carbonyl on non-terminal carbon)
+
+**UI Must NEVER Allow:**
+- Overlapping groups on same carbon
+- Impossible valence states
+- Groups to exist without their atom patterns
+
+### Constraints and Limitations
+
+**NOT ALLOWED:**
+- Metals (Na, K, Fe, etc.) - organic builder only
+- Ionic bonds - covalent only
+- Formal charges (Na⁺, Cl⁻) - neutral molecules only
+- Free radicals (special cases only, advanced feature)
+- Explicit hydrogen nodes (H is always implicit)
+- Valency violations (enforced by validation)
+
+**ALLOWED:**
+- Carbon, oxygen, nitrogen, sulfur, phosphorus, halogens (F, Cl, Br, I)
+- Single, double, triple covalent bonds
+- Aromatic resonance (benzene)
+- Rings (3-8 carbons common, 9+ with warning)
+- Branched structures
+- Multiple functional groups per molecule
+- Stereochemistry indicators (wedge/dash bonds for chirality)
+
+### Absolute Failure Conditions
+
+**The system FAILS if:**
+
+1. **A group exists without atoms**
+   - Functional group detected but corresponding atom pattern missing from graph
+
+2. **Formula does not change after mutation**
+   - Mutation applied but derived formula remains identical (indicates mutation didn't execute)
+
+3. **Carbon exceeds valence**
+   - Any carbon node has >4 bonds
+
+4. **Molecule can be "invalid but accepted"**
+   - System allows user to save/proceed with valency-violating structure
+
+5. **Functional groups are UI state**
+   - Groups stored as labels/properties rather than derived from graph topology
+
+6. **Template locks final molecule**
+   - User cannot mutate structure after template selection
+
+7. **Formula is editable**
+   - User can manually edit molecular formula field
+
+### Output Expectations
+
+**After Building a Structure, the System Provides:**
+
+1. **Carbon graph** (nodes + edges with bond orders) - PRIMARY DATA
+2. **Molecular formula** (Hill notation) - DERIVED, READ-ONLY
+3. **Molecular weight** (g/mol) - DERIVED, READ-ONLY
+4. **Functional groups** (detected list) - DERIVED, READ-ONLY
+5. **Validation status** (valid/invalid) - DERIVED, READ-ONLY
+6. **SMILES string** (if valid) - DERIVED, READ-ONLY
+7. **2D skeletal rendering** - DERIVED from graph
+8. **Optional 3D preview** - DERIVED from graph
+
+### Design Goal
+
+**The user must be able to:**
+
+- Start with "Fatty Acid" template → mutate to build oleic acid, linoleic acid, stearic acid, palmitic acid
+- Start with "Aromatic Ring" template → mutate to build toluene, phenol, aniline, nitrobenzene, aspirin
+- Start with "Alkane Chain" template → mutate to build branched alkanes, alcohols, amines, halides
+- Start with any template → produce chemically diverse molecules through graph mutations
 
 ## Visual Specifications
 
@@ -295,13 +656,71 @@ interface OrganicStructure {
 - Valency badge: "2/4" (used/total), color-coded (green/yellow/red)
 
 **Organic Structure Rendering (Phase 9):**
-- **Atoms**: CPK color scheme (C=black/gray, O=red, N=blue, H=white, S=yellow, P=orange, halogens=green/purple)
-- **Bonds**: Single (solid line), Double (parallel lines), Triple (3 parallel lines), Aromatic (circle in ring or dashed)
-- **Stereochemistry**: Wedge bonds (coming out), Dash bonds (going in), Wavy bonds (unknown)
-- **Canvas**: 800x600px with zoom/pan, grid background (optional)
-- **Atom labels**: Show for heteroatoms (O, N, S, etc.), hide carbons in skeletal formula
-- **Bond angles**: 120° for sp2 (benzene), 109.5° for sp3 (tetrahedral), 180° for sp (linear)
-- **Ring rendering**: Benzene circle inside hexagon, or alternating single/double bonds
+
+**Skeletal Formula (Default):**
+- Carbon atoms at vertices (line junctions and terminals)
+- Carbon labels hidden (implicit carbons)
+- Heteroatoms labeled (O, N, S, P, F, Cl, Br, I)
+- Implicit hydrogens hidden unless "Show H" toggled
+- Bonds drawn as lines between atom positions
+
+**Node Rendering:**
+- **Carbon nodes**: Vertices only (no label in skeletal mode)
+  - Quaternary carbon (4 bonds): intersection point
+  - Terminal carbon: end of line
+  - Valency badge: "3/4" displayed on hover or when selected
+- **Heteroatom nodes**: Element symbol + implicit H count
+  - Oxygen: "OH", "O" (in ether/carbonyl)
+  - Nitrogen: "NH₂", "NH", "N"
+  - Others: "SH", "PH₂", "Cl", "Br", etc.
+
+**Bond Rendering:**
+- **Single bond**: Solid line
+- **Double bond**: Two parallel lines (spacing: 3-4px)
+- **Triple bond**: Three parallel lines (spacing: 3-4px)
+- **Aromatic bond**: Circle inscribed in benzene ring OR alternating single/double with dashed style
+- **Stereochemistry:**
+  - Wedge bond (solid triangle): coming out of plane
+  - Dash bond (dashed line): going into plane
+  - Wavy bond: undefined stereochemistry
+
+**Bond Angles (Auto-calculated):**
+- sp³ hybridization: 109.5° (tetrahedral)
+- sp² hybridization: 120° (trigonal planar)
+- sp hybridization: 180° (linear)
+- Ring strain: adjusted for small rings (cyclopropane ~60°)
+
+**Colors:**
+- **CPK color scheme:**
+  - Carbon: #404040 (dark gray) - shown only in full structure mode
+  - Hydrogen: #FFFFFF (white) - shown when "Show H" enabled
+  - Oxygen: #FF0000 (red)
+  - Nitrogen: #0000FF (blue)
+  - Sulfur: #FFFF00 (yellow)
+  - Phosphorus: #FFA500 (orange)
+  - Fluorine: #90E050 (light green)
+  - Chlorine: #1FF01F (green)
+  - Bromine: #A62929 (dark red)
+  - Iodine: #940094 (purple)
+- **Monochrome mode**: All atoms black, bonds black
+
+**Valency Indicators:**
+- Green badge: Valency satisfied (e.g., "4/4")
+- Yellow badge: Valency satisfied but unusual (e.g., "6/6" on sulfur)
+- Red badge: Valency exceeded (e.g., "5/4" on carbon) - invalid structure
+
+**Canvas:**
+- Size: 800x600px (responsive)
+- Zoom: Scroll to zoom in/out (0.5x to 3x)
+- Pan: Click-drag background to pan
+- Grid: Optional dotted grid (toggle on/off)
+- Background: White or light gray
+
+**Interactive States:**
+- **Node hover**: Highlight node, show valency badge
+- **Node selected**: Glow effect, show modification menu
+- **Bond hover**: Thicken bond, show bond order
+- **Bond selected**: Highlight, show bond order change controls
 
 **Colors:**
 - **Elements**: Nonmetal #4ECDC4, Noble-gas #95E1D3, Alkali #F38181, Alkaline-earth #FDCB6E, Transition #A29BFE, Post-transition #74B9FF, Metalloid #FD79A8, Halogen #FF7675, Lanthanide #FFEAA7, Actinide #DFE6E9
@@ -317,20 +736,30 @@ interface OrganicStructure {
 **Phase 6 (✓):** Auth (NextAuth + Google), compound CRUD
 **Phase 7 (✓):** Interactive compound builder: @dnd-kit, canvas, bonding intelligence, valency validation, auto-spread, external factors
 **Phase 8 (✓):** Polish, error handling, responsive design, unit testing (Jest)
-**Phase 9 (NEW):** Organic Chemistry Library
-  - Create OrganicStructure model with SMILES, atoms, bonds, functional groups
+**Phase 9 (NEW):** Organic Chemistry Builder (Template-Seed + Structural Modification)
+  - Create OrganicStructure model with carbon graph (nodes + edges), derived formula, validation state
+  - Template seed system: structural scaffolds (NOT final molecules)
   - API routes: `GET/POST /api/organic`, `GET /api/organic/[id]`, `GET /api/organic/templates`
-  - Organic structures page: `/organic-chemistry` with grid view, filters, search
-  - Create structure page: `/organic-chemistry/create` with 2D canvas editor
-  - Structure detail page: `/organic-chemistry/[id]` with 2D/3D views, properties
-  - Components: StructureCanvas, AtomPalette, BondTools, TemplateSelector
-  - Predefined templates: Benzene, alkanes, functional groups (stored in organic-templates.json)
-  - SMILES parser and generator (using RDKit.js or Kekule.js library)
-  - 2D structure rendering using Canvas API or SVG with automatic layout
-  - Optional 3D preview using Three.js with conformer generation
-  - Stereochemistry support (wedge/dash bonds, chiral centers)
-  - Functional group detection and highlighting
-  - Export options: PNG, SVG, MOL file, SMILES string
+  - Organic structures page: `/organic-chemistry` with grid view, filters (by functional groups, formula)
+  - Create structure page: `/organic-chemistry/create` with carbon graph editor
+  - Structure detail page: `/organic-chemistry/[id]` with 2D skeletal rendering, properties
+  - Components:
+    - TemplateSeedSelector: Browse and select structural scaffolds
+    - CarbonGraphCanvas: Interactive carbon graph editor with node/edge manipulation
+    - StructureModificationTools: Extend, shorten, branch, cyclize, unsaturate, saturate
+    - FunctionalGroupPalette: Attach/remove functional groups
+    - ValencyValidator: Real-time valency checking with visual feedback
+    - FormulaDeriver: Auto-calculate molecular formula from carbon graph
+    - StructureRenderer2D: Skeletal formula rendering (SVG)
+  - Template catalog: Alkane chain, alkene chain, alkyne chain, fatty acid, alcohol, aromatic ring, cycloalkane, carbonyl
+  - Carbon graph operations: Add/remove nodes, change bond order, attach functional groups
+  - Implicit hydrogen calculation: Auto-adjust H count based on valency
+  - Functional group detection: Pattern matching on carbon graph subgraphs
+  - Derived properties: Molecular formula (Hill notation), molecular weight, unsaturation degree
+  - Real-time validation: Valency checking, error/warning messages
+  - Optional: SMILES generation (if RDKit.js integrated)
+  - Optional: 3D preview using Three.js (conformer generation)
+  - Export options: PNG (2D structure), SVG (vector), SMILES string
 
 ## Setup & Configuration
 
@@ -372,29 +801,63 @@ interface OrganicStructure {
 - [OpenBabel](https://openbabel.org/) - Chemical file format conversion reference
 - [SMILES Tutorial](https://www.daylight.com/dayhtml/doc/theory/theory.smiles.html) - SMILES notation guide
 
-## Organic Chemistry Implementation Notes (Phase 9)
+## Organic Chemistry Builder - Architecture (Phase 9)
 
-**Libraries to Consider:**
-1. **RDKit.js** (Recommended) - Full-featured chemistry toolkit, SMILES parsing, structure validation
-2. **Kekule.js** - Pure JavaScript, 2D/3D rendering, structure editor components
-3. **OpenChemLib** - Fast, lightweight, good for structure rendering
-4. **JSME** - Molecule editor widget (may need integration work)
+### Data Flow (Mandatory)
 
-**SMILES Examples:**
-- Benzene: `c1ccccc1` or `C1=CC=CC=C1`
-- Ethanol: `CCO`
-- Acetic acid: `CC(=O)O`
-- Aspirin: `CC(=O)Oc1ccccc1C(=O)O`
-- Caffeine: `CN1C=NC2=C1C(=O)N(C(=O)N2C)C`
+```
+Template Seed → Graph Initialization → Structural Mutations → Validation → Derived Properties → (Save if valid)
+```
 
-**Development Approach:**
-1. Start with template browser (predefined structures stored as SMILES)
-2. Implement 2D structure viewer (render SMILES to 2D canvas)
-3. Add basic editor (click to add atoms/bonds, generate SMILES)
-4. Implement functional group detection
-5. Add 3D preview (optional, using conformer generation)
-6. Implement save/load from MongoDB
-7. Add search and filtering
-8. Implement stereochemistry tools (advanced)
+**Graph is Primary, Everything Else is Derived:**
+- Carbon graph = source of truth
+- Formula = derived from graph
+- Functional groups = detected from graph
+- Molecular weight = calculated from graph
+- Validation = computed from graph topology
 
-*Last Updated: Dec 12, 2025 - Added Phase 9: Organic Chemistry library with structure editor, templates, and 2D/3D rendering*
+### Implementation Requirements
+
+**Validation-First Design:**
+- Every modification must pass validation BEFORE being applied
+- Invalid operations are PREVENTED, not corrected after the fact
+- No "invalid but accepted" states
+
+**Mutation Operations (Graph Rewiring):**
+- `extendChain(nodeId)` - adds carbon node with single bond
+- `shortenChain(nodeId)` - removes terminal carbon node
+- `branchCarbon(nodeId)` - adds branch carbon to existing node
+- `cyclize(nodeA, nodeB)` - connects two non-adjacent carbons to form ring
+- `addDoubleBond(bondId)` - increases bond order (1→2, 2→3)
+- `removeDoubleBond(bondId)` - decreases bond order (3→2, 2→1)
+- `attachFunctionalGroup(nodeId, groupType)` - adds heteroatom subgraph
+- `removeFunctionalGroup(nodeId)` - removes heteroatom subgraph
+
+**Derived Computation Functions:**
+- `calculateImplicitHydrogens(node, edges)` - returns H count for node
+- `updateImplicitHydrogens(graph)` - recalculates H for all nodes
+- `validateValency(graph)` - returns {isValid, errors, warnings}
+- `detectFunctionalGroups(graph)` - returns detected group patterns
+- `calculateMolecularFormula(graph)` - returns Hill notation string
+- `calculateMolecularWeight(graph)` - returns float (g/mol)
+
+**Storage Model:**
+```typescript
+interface OrganicStructure {
+  carbonGraph: {
+    nodes: { id, element, position, implicitHydrogens }[]
+    edges: { id, from, to, bondOrder, bondType }[]
+  }
+  derived: {
+    molecularFormula: string    // READ-ONLY
+    molecularWeight: number      // READ-ONLY
+    functionalGroups: string[]   // READ-ONLY (detected)
+  }
+  validation: {
+    isValid: boolean             // READ-ONLY
+    errors: string[]             // READ-ONLY
+  }
+}
+```
+
+*Last Updated: Dec 16, 2025 - Organic Chemistry Builder redefined as graph-based mutation system with derived properties*

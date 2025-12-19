@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useCompoundCanvasStore } from "@/lib/stores/useCompoundCanvasStore";
+import { modalService } from "@/lib/utils/modal-service";
 
 interface ExampleCompound {
   name: string;
@@ -9,7 +10,7 @@ interface ExampleCompound {
 }
 
 export default function QuickExamples() {
-  const { reset } = useCompoundCanvasStore();
+  const { reset, canvasElements } = useCompoundCanvasStore();
 
   const examples: ExampleCompound[] = [
     {
@@ -39,7 +40,7 @@ export default function QuickExamples() {
     },
   ];
 
-  const loadExample = async (example: ExampleCompound) => {
+  const loadExampleInternal = async (example: ExampleCompound) => {
     try {
       reset();
 
@@ -64,6 +65,23 @@ export default function QuickExamples() {
       });
     } catch (error) {
       console.error("Error loading example:", error);
+      modalService.showError("Failed to load example compound. Please try again.", "Load Error");
+    }
+  };
+
+  const loadExample = (example: ExampleCompound) => {
+    // Check if canvas has elements
+    if (canvasElements.length > 0) {
+      modalService.showWarning(
+        `Loading "${example.name}" will clear all elements currently on the canvas. Do you want to continue?`,
+        () => {
+          loadExampleInternal(example);
+        },
+        "Clear Canvas",
+        "Load Example"
+      );
+    } else {
+      loadExampleInternal(example);
     }
   };
 

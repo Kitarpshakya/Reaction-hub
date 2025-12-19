@@ -19,7 +19,8 @@
       "Bash(findstr:*)",
       "Bash(node -e:*)",
       "Bash(rm:*)",
-      "Bash(rmdir:*)"
+      "Bash(rmdir:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

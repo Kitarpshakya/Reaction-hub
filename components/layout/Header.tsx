@@ -29,6 +29,18 @@ export default function Header() {
     if (pathname === "/compounds") {
       return { showBack: true, backUrl: "/", title: "Chemical Compounds" };
     }
+    if (pathname === "/organic-chemistry/create") {
+      return { showBack: true, backUrl: "/organic-chemistry", title: "Create Organic Compound" };
+    }
+    if (pathname?.match(/^\/organic-chemistry\/[^/]+\/edit$/)) {
+      return { showBack: true, backUrl: "/organic-chemistry", title: "Edit Organic Compound" };
+    }
+    if (pathname?.match(/^\/organic-chemistry\/[^/]+$/)) {
+      return { showBack: true, backUrl: "/organic-chemistry", title: "Organic Compound Details" };
+    }
+    if (pathname === "/organic-chemistry") {
+      return { showBack: true, backUrl: "/", title: "Organic Compounds" };
+    }
     return { showBack: false, backUrl: "/", title: "" };
   };
 

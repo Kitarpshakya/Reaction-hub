@@ -1,259 +1,1275 @@
 "use client";
 
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { OrganicTemplate } from "@/lib/types/organic";
-import MoleculeViewer from "@/components/organic/MoleculeViewer";
+import { useModal } from "@/lib/contexts/ModalContext";
+import {
+  MoleculeGraph,
+  updateImplicitHydrogens,
+  updateHybridization,
+  validateValence,
+} from "@/lib/utils/organic-graph";
+import { TEMPLATE_CATALOG, createTemplate, TemplateMetadata } from "@/lib/utils/organic-templates";
+import {
+  computeFormula,
+  computeMolecularWeight,
+  detectFunctionalGroups,
+  countTotalAtoms,
+  countCarbonAtoms,
+  computeIUPACName,
+} from "@/lib/utils/organic-validation";
+import {
+  extendChain,
+  shortenChain,
+  unsaturateBond,
+  saturateBond,
+  branchCarbon,
+  attachSubstituent,
+  cyclize,
+  removeSubstituent,
+  MutationResult,
+} from "@/lib/utils/organic-mutations";
 
-export default function CreateOrganicStructurePage() {
+// Define OrganicStructure interface (minimal version for display)
+interface OrganicStructure {
+  carbonGraph: MoleculeGraph;
+  derived: {
+    molecularFormula: string;
+    molecularWeight: number;
+    totalAtoms: number;
+    carbonCount: number;
+    iupacName: string;
+  };
+  validation: {
+    isValid: boolean;
+    errors: string[];
+    warnings: string[];
+  };
+}
+
+export default function OrganicStructurePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [templates, setTemplates] = useState<OrganicTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<OrganicTemplate | null>(null);
-  const [name, setName] = useState("");
-  const [tags, setTags] = useState("");
-  const [isPublic, setIsPublic] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { showAlert, showError, showSuccess, showWarning } = useModal();
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("blank-canvas");
+  const [graph, setGraph] = useState<MoleculeGraph | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedBondId, setSelectedBondId] = useState<string | null>(null);
+  const [cyclizeMode, setCyclizeMode] = useState(false);
+  const [cyclizeFirstNode, setCyclizeFirstNode] = useState<string | null>(null);
+  const [chainLength, setChainLength] = useState(4);
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [structureName, setStructureName] = useState("");
+  const [structureDescription, setStructureDescription] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
-    // Redirect if not authenticated
     if (status === "unauthenticated") {
       router.push("/login?callbackUrl=/organic-chemistry/create");
     }
   }, [status, router]);
 
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
+  const loadTemplate = useCallback(
+    (templateId: string, length?: number, skipWarning = false) => {
+      // Check if canvas has meaningful content (more than just blank canvas)
+      // Blank canvas typically has 1 carbon node
+      const hasContent = graph && graph.nodes.length > 1;
 
-  const fetchTemplates = async () => {
-    try {
-      const res = await fetch("/api/organic-structures/templates");
-      if (res.ok) {
-        const data = await res.json();
-        setTemplates(data.templates || []);
+      if (!skipWarning && hasContent) {
+        const template = TEMPLATE_CATALOG.find((t) => t.type === templateId);
+        const templateName = template?.name || "template";
+
+        showWarning(
+          `Loading "${templateName}" will clear all current work on the canvas. Do you want to continue?`,
+          () => {
+            loadTemplate(templateId, length, true);
+          },
+          "Clear Canvas",
+          "Load Template"
+        );
+        return;
       }
-    } catch (error) {
-      console.error("Error fetching templates:", error);
+
+      const template = TEMPLATE_CATALOG.find((t) => t.type === templateId);
+      if (!template) return;
+
+      // Use createTemplate instead of template.factory()
+      const params = { chainLength: length || chainLength };
+      let initialGraph = createTemplate(template.type, params);
+
+      setGraph(initialGraph);
+      setSelectedTemplate(templateId);
+      setSelectedNodeId(null);
+      setSelectedBondId(null);
+      setCyclizeMode(false);
+      setDraggingNodeId(null);
+      setDragStart(null);
+      setHasUnsavedChanges(false);
+    },
+    [chainLength, graph, showWarning]
+  );
+
+  // Load blank canvas by default on mount
+  useEffect(() => {
+    if (status === "authenticated" && !graph) {
+      const initialGraph = createTemplate("blank-canvas");
+      setGraph(initialGraph);
+      setSelectedTemplate("blank-canvas");
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
-  const handleTemplateSelect = (template: OrganicTemplate) => {
-    setSelectedTemplate(template);
-    setName(template.name);
-  };
+  const getStructure = useCallback((): OrganicStructure | null => {
+    if (!graph) return null;
 
-  const handleCreate = async () => {
-    if (!selectedTemplate) {
-      setError("Please select a template");
-      return;
+    const validation = validateValence(graph);
+    const formula = computeFormula(graph);
+    const weight = computeMolecularWeight(graph);
+    const iupacName = computeIUPACName(graph);
+
+    return {
+      carbonGraph: graph,
+      derived: {
+        molecularFormula: formula,
+        molecularWeight: weight,
+        totalAtoms: countTotalAtoms(graph),
+        carbonCount: countCarbonAtoms(graph),
+        iupacName,
+      },
+      validation,
+    };
+  }, [graph]);
+
+  const handleExtend = useCallback(() => {
+    if (!graph || !selectedNodeId) return;
+    const result = extendChain(graph, selectedNodeId);
+    if (result.success && result.graph) {
+      setGraph(result.graph);
+      setHasUnsavedChanges(true);
+    } else {
+      showError(result.error || "Failed to extend chain");
     }
+  }, [graph, selectedNodeId, showError]);
 
-    if (!name.trim()) {
-      setError("Please enter a name");
-      return;
+  const handleShorten = useCallback(() => {
+    if (!graph || !selectedNodeId) return;
+    const result = shortenChain(graph, selectedNodeId);
+    if (result.success && result.graph) {
+      setGraph(result.graph);
+      setSelectedNodeId(null);
+      setHasUnsavedChanges(true);
+    } else {
+      showError(result.error || "Failed to shorten chain");
     }
+  }, [graph, selectedNodeId, showError]);
 
-    if (!session?.user) {
-      setError("You must be signed in to create structures");
-      return;
+  const handleBranch = useCallback(() => {
+    if (!graph || !selectedNodeId) return;
+    const result = branchCarbon(graph, selectedNodeId);
+    if (result.success && result.graph) {
+      setGraph(result.graph);
+      setHasUnsavedChanges(true);
+    } else {
+      showError(result.error || "Failed to add branch");
     }
+  }, [graph, selectedNodeId, showError]);
 
-    setLoading(true);
-    setError("");
+  // Helper function to check if a bond is part of a cycle
+  const isBondInCycle = useCallback(
+    (bondFrom: string, bondTo: string): boolean => {
+      if (!graph) return false;
 
-    try {
-      const tagsArray = tags
-        .split(",")
-        .map(t => t.trim())
-        .filter(t => t.length > 0);
+      // Create adjacency list excluding the bond we're checking
+      const adjacency: Map<string, string[]> = new Map();
+      graph.edges.forEach((edge) => {
+        if ((edge.from === bondFrom && edge.to === bondTo) || (edge.from === bondTo && edge.to === bondFrom)) {
+          return; // Skip this bond
+        }
 
-      const res = await fetch("/api/organic-structures", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          commonName: selectedTemplate.commonName,
-          category: selectedTemplate.category,
-          smiles: selectedTemplate.smiles,
-          molecularFormula: selectedTemplate.molecularFormula,
-          molecularWeight: selectedTemplate.molecularWeight,
-          atoms: selectedTemplate.atoms,
-          bonds: selectedTemplate.bonds,
-          functionalGroups: selectedTemplate.functionalGroups?.map(fg => ({ name: fg, position: [] })) || [],
-          isTemplate: false,
-          templateCategory: selectedTemplate.templateCategory,
-          isPublic,
-          tags: tagsArray,
-        }),
+        if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
+        if (!adjacency.has(edge.to)) adjacency.set(edge.to, []);
+        adjacency.get(edge.from)!.push(edge.to);
+        adjacency.get(edge.to)!.push(edge.from);
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      // BFS to check if there's still a path between the two nodes
+      const visited = new Set<string>();
+      const queue = [bondFrom];
+      visited.add(bondFrom);
+
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (current === bondTo) return true; // Found alternate path = cycle exists
+
+        const neighbors = adjacency.get(current) || [];
+        for (const neighbor of neighbors) {
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor);
+            queue.push(neighbor);
+          }
+        }
+      }
+
+      return false; // No alternate path = bond is not in cycle
+    },
+    [graph]
+  );
+
+  const handleSetBondOrder = useCallback(
+    (targetOrder: 1 | 2 | 3) => {
+      if (!graph || !selectedBondId) return;
+      const bond = graph.edges.find((e) => e.id === selectedBondId);
+      if (!bond) return;
+
+      // Prevent modification of aromatic bonds
+      if (bond.bondType === 'aromatic') {
+        showAlert("Cannot modify aromatic bonds. Aromatic ring structure is fixed.", "Aromatic Bond");
+        return;
+      }
+
+      if (targetOrder === bond.bondOrder) {
+        showAlert("Bond is already at this order", "Bond Order");
+        return;
+      }
+
+      if (targetOrder > bond.bondOrder) {
+        // Increasing bond order (unsaturate)
+        let currentGraph = graph;
+        for (let i = bond.bondOrder; i < targetOrder; i++) {
+          const result = unsaturateBond(currentGraph, bond.from, bond.to);
+          if (!result.success || !result.graph) {
+            showError(result.error || "Failed to increase bond order");
+            return;
+          }
+          currentGraph = result.graph;
+        }
+        setGraph(currentGraph);
+        setHasUnsavedChanges(true);
+      } else {
+        // Decreasing bond order (saturate)
+        let currentGraph = graph;
+        for (let i = bond.bondOrder; i > targetOrder; i--) {
+          const result = saturateBond(currentGraph, bond.from, bond.to);
+          if (!result.success || !result.graph) {
+            showError(result.error || "Failed to decrease bond order");
+            return;
+          }
+          currentGraph = result.graph;
+        }
+        setGraph(currentGraph);
+        setHasUnsavedChanges(true);
+      }
+    },
+    [graph, selectedBondId, showAlert, showError]
+  );
+
+  const handleRemoveBond = useCallback(() => {
+    if (!graph || !selectedBondId) return;
+    const bond = graph.edges.find((e) => e.id === selectedBondId);
+    if (!bond) return;
+
+    // Prevent removal of aromatic bonds
+    if (bond.bondType === 'aromatic') {
+      showAlert("Cannot remove aromatic bonds. Aromatic ring structure is fixed.", "Aromatic Bond");
+      return;
+    }
+
+    // Only allow removal if bond is part of a cycle
+    if (!isBondInCycle(bond.from, bond.to)) {
+      showAlert(
+        "Cannot remove bond: Bond must be part of a cycle (ring structure). Removing this bond would break the molecule.",
+        "Remove Bond"
+      );
+      return;
+    }
+
+    // First reduce to single bond if not already
+    if (bond.bondOrder > 1) {
+      let currentGraph = graph;
+      for (let i = bond.bondOrder; i > 1; i--) {
+        const result = saturateBond(currentGraph, bond.from, bond.to);
+        if (!result.success || !result.graph) {
+          showError(result.error || "Failed to reduce bond order");
+          return;
+        }
+        currentGraph = result.graph;
+      }
+      setGraph(currentGraph);
+      setHasUnsavedChanges(true);
+      // Don't remove yet, let user confirm by clicking again
+      return;
+    }
+
+    // Remove the bond
+    const updatedGraph = {
+      ...graph,
+      edges: graph.edges.filter((e) => e.id !== selectedBondId),
+    };
+
+    // Recalculate implicit hydrogens
+    updateImplicitHydrogens(updatedGraph);
+
+    setGraph(updatedGraph);
+    setSelectedBondId(null);
+    setHasUnsavedChanges(true);
+  }, [graph, selectedBondId, isBondInCycle, showAlert, showError]);
+
+  const handleAttachGroup = useCallback(
+    (groupType: "hydroxyl" | "amino" | "nitro" | "carbonyl" | "halogen", halogen?: "F" | "Cl" | "Br" | "I") => {
+      if (!graph || !selectedNodeId) return;
+      const result = attachSubstituent(graph, selectedNodeId, { type: groupType, halogen });
+      if (result.success && result.graph) {
+        setGraph(result.graph);
+        setHasUnsavedChanges(true);
+      } else {
+        showError(result.error || "Failed to attach group");
+      }
+    },
+    [graph, selectedNodeId, showError]
+  );
+
+  const handleRemoveGroup = useCallback(() => {
+    if (!graph || !selectedNodeId) return;
+    const result = removeSubstituent(graph, selectedNodeId);
+    if (result.success && result.graph) {
+      setGraph(result.graph);
+      setSelectedNodeId(null);
+      setHasUnsavedChanges(true);
+    } else {
+      showError(result.error || "Failed to remove group");
+    }
+  }, [graph, selectedNodeId, showError]);
+
+  const handleCyclize = useCallback(() => {
+    if (!cyclizeMode) {
+      setCyclizeMode(true);
+      setCyclizeFirstNode(null);
+      return;
+    }
+
+    if (graph && cyclizeFirstNode && selectedNodeId && cyclizeFirstNode !== selectedNodeId) {
+      const result = cyclize(graph, cyclizeFirstNode, selectedNodeId);
+      if (result.success && result.graph) {
+        setGraph(result.graph);
+        setCyclizeMode(false);
+        setCyclizeFirstNode(null);
+        setSelectedNodeId(null);
+        setHasUnsavedChanges(true);
+      } else {
+        showError(result.error || "Failed to cyclize");
+      }
+    }
+  }, [graph, cyclizeMode, cyclizeFirstNode, selectedNodeId, showError]);
+
+  const handleNodeClick = useCallback(
+    (nodeId: string) => {
+      if (cyclizeMode) {
+        if (!cyclizeFirstNode) {
+          setCyclizeFirstNode(nodeId);
+        } else if (cyclizeFirstNode !== nodeId) {
+          if (graph) {
+            const result = cyclize(graph, cyclizeFirstNode, nodeId);
+            if (result.success && result.graph) {
+              setGraph(result.graph);
+              setHasUnsavedChanges(true);
+            } else {
+              showError(result.error || "Failed to cyclize");
+            }
+          }
+          setCyclizeMode(false);
+          setCyclizeFirstNode(null);
+        }
+      } else {
+        setSelectedNodeId(nodeId);
+        setSelectedBondId(null);
+      }
+    },
+    [cyclizeMode, cyclizeFirstNode, graph, showError]
+  );
+
+  const handleBondClick = useCallback(
+    (bondId: string) => {
+      if (!cyclizeMode) {
+        setSelectedBondId(bondId);
+        setSelectedNodeId(null);
+      }
+    },
+    [cyclizeMode]
+  );
+
+  // Helper: Detect if node is part of an aromatic ring
+  const getAromaticRingNodes = useCallback((nodeId: string): string[] | null => {
+    if (!graph) return null;
+
+    // Check if node has any aromatic bonds
+    const aromaticBonds = graph.edges.filter(
+      e => e.bondType === 'aromatic' && (e.from === nodeId || e.to === nodeId)
+    );
+
+    if (aromaticBonds.length === 0) return null;
+
+    // BFS to find all connected aromatic nodes
+    const aromaticNodes = new Set<string>([nodeId]);
+    const queue = [nodeId];
+    const visited = new Set<string>([nodeId]);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const connectedAromaticBonds = graph.edges.filter(
+        e => e.bondType === 'aromatic' && (e.from === current || e.to === current)
+      );
+
+      for (const bond of connectedAromaticBonds) {
+        const neighbor = bond.from === current ? bond.to : bond.from;
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          aromaticNodes.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    return Array.from(aromaticNodes);
+  }, [graph]);
+
+  const handleNodeMouseDown = useCallback(
+    (nodeId: string, e: React.MouseEvent<SVGCircleElement>) => {
+      if (cyclizeMode) return; // Don't drag in cyclize mode
+
+      e.stopPropagation();
+      setDraggingNodeId(nodeId);
+
+      if (svgRef.current) {
+        const svg = svgRef.current;
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+        setDragStart({ x: svgP.x, y: svgP.y });
+      }
+    },
+    [cyclizeMode]
+  );
+
+  const handleSvgMouseMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      if (!draggingNodeId || !dragStart || !graph || !svgRef.current) return;
+
+      const svg = svgRef.current;
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+
+      const dx = svgP.x - dragStart.x;
+      const dy = svgP.y - dragStart.y;
+
+      // Get dynamic SVG dimensions
+      const svgRect = svg.getBoundingClientRect();
+      const maxX = svgRect.width - 100; // Leave margin for node radius + offset
+      const maxY = svgRect.height - 100;
+
+      // Check if dragging node is part of aromatic ring
+      const aromaticRingNodes = getAromaticRingNodes(draggingNodeId);
+
+      // Update node position
+      const updatedGraph = {
+        ...graph,
+        nodes: graph.nodes.map((node) => {
+          // If dragging aromatic node, move entire ring together
+          if (aromaticRingNodes && aromaticRingNodes.includes(node.id)) {
+            return {
+              ...node,
+              position: {
+                x: Math.max(0, Math.min(maxX, node.position.x + dx)),
+                y: Math.max(0, Math.min(maxY, node.position.y + dy)),
+              },
+            };
+          }
+          // Otherwise only move the dragged node
+          else if (node.id === draggingNodeId) {
+            return {
+              ...node,
+              position: {
+                x: Math.max(0, Math.min(maxX, node.position.x + dx)),
+                y: Math.max(0, Math.min(maxY, node.position.y + dy)),
+              },
+            };
+          }
+          return node;
+        }),
+      };
+
+      setGraph(updatedGraph);
+      setDragStart({ x: svgP.x, y: svgP.y });
+    },
+    [draggingNodeId, dragStart, graph, getAromaticRingNodes]
+  );
+
+  const handleSvgMouseUp = useCallback(() => {
+    setDraggingNodeId(null);
+    setDragStart(null);
+  }, []);
+
+  const handleCanvasClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    // Only deselect if clicking directly on SVG (not on nodes/bonds)
+    if (e.target === e.currentTarget) {
+      setSelectedNodeId(null);
+      setSelectedBondId(null);
+    }
+  }, []);
+
+  const handleSaveStructure = useCallback(async () => {
+    if (!graph || !structureName.trim()) {
+      showAlert("Please enter a structure name", "Missing Information");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const structure = getStructure();
+      if (!structure || !structure.validation.isValid) {
+        showError("Cannot save invalid structure. Please fix validation errors first.");
+        setIsSaving(false);
+        return;
+      }
+
+      // Transform graph to API format
+      const atoms = graph.nodes.map(node => ({
+        id: node.id,
+        element: node.element,
+        position: {
+          x: node.position.x,
+          y: node.position.y,
+          z: 0
+        },
+        hybridization: node.hybridization,
+        charge: 0
+      }));
+
+      // Map internal bond types to API-valid enum values
+      const mapBondType = (bondOrder: number, bondType: string): string => {
+        if (bondType === 'aromatic') return 'aromatic';
+        if (bondOrder === 3) return 'triple';
+        if (bondOrder === 2) return 'double';
+        return 'single';
+      };
+
+      const bonds = graph.edges.map(edge => ({
+        id: edge.id,
+        from: edge.from,
+        to: edge.to,
+        type: mapBondType(edge.bondOrder, edge.bondType)
+      }));
+
+      const functionalGroups = detectFunctionalGroups(graph).map(group => ({
+        name: group.name,
+        position: group.nodeIds?.map((_, i) => i) || []
+      }));
+
+      // Determine category based on structure
+      const detectedGroups = detectFunctionalGroups(graph);
+      const hasAromatic = graph.edges.some(e => e.bondType === 'aromatic');
+      const hasDoubleBond = graph.edges.some(e => e.bondOrder === 2 && e.bondType !== 'aromatic');
+      const hasTripleBond = graph.edges.some(e => e.bondOrder === 3);
+
+      let category = 'alkane';
+      if (hasAromatic) category = 'aromatic';
+      else if (detectedGroups.some(g => g.name === 'carboxylic-acid')) category = 'carboxylic-acid';
+      else if (detectedGroups.some(g => g.name === 'aldehyde')) category = 'aldehyde';
+      else if (detectedGroups.some(g => g.name === 'ketone')) category = 'ketone';
+      else if (detectedGroups.some(g => g.name === 'alcohol')) category = 'alcohol';
+      else if (detectedGroups.some(g => g.name === 'amine')) category = 'amine';
+      else if (detectedGroups.some(g => g.name === 'ester')) category = 'ester';
+      else if (detectedGroups.some(g => g.name === 'ether')) category = 'ether';
+      else if (detectedGroups.some(g => g.name === 'alkyl-halide')) category = 'halide';
+      else if (hasTripleBond) category = 'alkyne';
+      else if (hasDoubleBond) category = 'alkene';
+
+      // Prepare payload
+      const payload = {
+        name: structureName.trim(),
+        iupacName: structure.derived.iupacName,
+        commonName: structureDescription.trim() || undefined,
+        category,
+        smiles: "C", // Placeholder - would need actual SMILES generation
+        atoms,
+        bonds,
+        functionalGroups,
+        molecularFormula: structure.derived.molecularFormula,
+        molecularWeight: structure.derived.molecularWeight,
+        renderData: {
+          bondLength: 50,
+          angle: 120,
+          showHydrogens: false,
+          colorScheme: "cpk"
+        },
+        isPublic: true,
+        tags: []
+      };
+
+      const response = await fetch("/api/organic-structures", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showSuccess("Structure saved successfully!");
+        setStructureName("");
+        setStructureDescription("");
+        setHasUnsavedChanges(false);
+        // Optionally redirect to the structure detail page
         router.push(`/organic-chemistry/${data.structure.id}`);
       } else {
-        const data = await res.json();
-        setError(data.error || "Failed to create structure");
+        showError(`Failed to save structure: ${data.error}`);
       }
     } catch (error) {
-      console.error("Error creating structure:", error);
-      setError("Failed to create structure");
+      console.error("Error saving structure:", error);
+      showError("An error occurred while saving the structure");
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
-  };
+  }, [graph, structureName, structureDescription, getStructure, router, showAlert, showError, showSuccess]);
+
+  const structure = getStructure();
 
   if (status === "loading") {
     return (
       <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6C5CE7]"></div>
       </div>
     );
   }
 
-  if (status === "unauthenticated") {
-    return null; // Will redirect
+  if (!session) {
+    return null;
   }
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
-      <div className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="mb-8">
-          <Link
-            href="/organic-chemistry"
-            className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-4"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Library
-          </Link>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Create Organic Structure</h1>
-          <p className="text-white/60 text-lg">Select a template and customize your structure</p>
-        </div>
+      <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+        {/* Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {
+            <>
+              {/* Left Panel - Mutation Tools */}
+              <div className="w-80 bg-gray-800 border-r border-gray-700 overflow-y-auto">
+                <div className="p-4">
+                  <h2 className="text-lg font-bold mb-4 text-white">Mutation Tools</h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left column - Template selection */}
-          <div>
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Select Template</h2>
-              <div className="grid grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
-                {templates.map((template) => (
-                  <motion.button
-                    key={template.name}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleTemplateSelect(template)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
-                      selectedTemplate?.name === template.name
-                        ? "border-[#6C5CE7] bg-[#6C5CE7]/20"
-                        : "border-white/10 bg-white/5 hover:border-white/20"
-                    }`}
-                  >
-                    <h3 className="text-white font-bold mb-1">{template.name}</h3>
-                    <p className="text-white/60 text-sm mb-2">{template.molecularFormula}</p>
-                    <p className="text-white/40 text-xs line-clamp-2">{template.description}</p>
-                  </motion.button>
-                ))}
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-xs font-semibold mb-2 text-gray-400">Skeleton Operations</h3>
+                      <div className="space-y-1.5">
+                        <button
+                          onClick={handleExtend}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#00D9FF] text-gray-900 font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#00C4E6] transition-colors text-sm"
+                        >
+                          Extend Chain
+                        </button>
+                        <button
+                          onClick={handleShorten}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#00D9FF] text-gray-900 font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#00C4E6] transition-colors text-sm"
+                        >
+                          Shorten Chain
+                        </button>
+                        <button
+                          onClick={handleBranch}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#00D9FF] text-gray-900 font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#00C4E6] transition-colors text-sm"
+                        >
+                          Add Branch
+                        </button>
+                        <button
+                          onClick={handleCyclize}
+                          className={`w-full px-3 py-1.5 font-medium rounded transition-colors text-sm disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed ${
+                            cyclizeMode
+                              ? "bg-yellow-500 text-gray-900"
+                              : "bg-[#00D9FF] text-gray-900 hover:bg-[#00C4E6]"
+                          }`}
+                          disabled={!graph}
+                        >
+                          {cyclizeMode ? (cyclizeFirstNode ? "Select 2nd Node" : "Select 1st Node") : "Cyclize"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xs font-semibold mb-2 text-gray-400">Bond Operations</h3>
+                      {selectedBondId &&
+                        graph &&
+                        (() => {
+                          const selectedBond = graph.edges.find((e) => e.id === selectedBondId);
+                          const isInCycle = selectedBond ? isBondInCycle(selectedBond.from, selectedBond.to) : false;
+                          const isAromatic = selectedBond?.bondType === 'aromatic';
+                          return (
+                            <div className="mb-1.5 p-1.5 bg-gray-700 rounded text-xs text-gray-300">
+                              <div>
+                                Current:{" "}
+                                {selectedBond?.bondOrder === 1
+                                  ? "Single"
+                                  : selectedBond?.bondOrder === 2
+                                  ? "Double"
+                                  : "Triple"}{" "}
+                                Bond
+                              </div>
+                              {isAromatic && (
+                                <div className="text-purple-400 mt-0.5 font-semibold">
+                                  🔒 Aromatic (Locked)
+                                </div>
+                              )}
+                              {isInCycle && !isAromatic && <div className="text-yellow-400 mt-0.5">✓ Part of cycle</div>}
+                            </div>
+                          );
+                        })()}
+                      <div className="space-y-1.5">
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <button
+                            onClick={() => handleSetBondOrder(1)}
+                            disabled={!selectedBondId}
+                            className="px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
+                            title="Set to single bond"
+                          >
+                            Single
+                          </button>
+                          <button
+                            onClick={() => handleSetBondOrder(2)}
+                            disabled={!selectedBondId}
+                            className="px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
+                            title="Set to double bond"
+                          >
+                            Double
+                          </button>
+                          <button
+                            onClick={() => handleSetBondOrder(3)}
+                            disabled={!selectedBondId}
+                            className="px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
+                            title="Set to triple bond"
+                          >
+                            Triple
+                          </button>
+                        </div>
+                        <button
+                          onClick={handleRemoveBond}
+                          disabled={!selectedBondId}
+                          className="w-full px-3 py-1.5 bg-red-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-red-700 transition-colors text-xs"
+                          title="Remove bond (only allowed in cyclic structures)"
+                        >
+                          Remove Bond
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xs font-semibold mb-2 text-gray-400">Functional Groups</h3>
+                      <div className="space-y-1.5">
+                        <button
+                          onClick={() => handleAttachGroup("hydroxyl")}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#6C5CE7] text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#5B4BC7] transition-colors text-xs"
+                        >
+                          Attach -OH
+                        </button>
+                        <button
+                          onClick={() => handleAttachGroup("amino")}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#6C5CE7] text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#5B4BC7] transition-colors text-xs"
+                        >
+                          Attach -NH₂
+                        </button>
+                        <button
+                          onClick={() => handleAttachGroup("carbonyl")}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#6C5CE7] text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#5B4BC7] transition-colors text-xs"
+                        >
+                          Attach =O
+                        </button>
+                        <button
+                          onClick={() => handleAttachGroup("nitro")}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#6C5CE7] text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#5B4BC7] transition-colors text-xs"
+                        >
+                          Attach -NO₂
+                        </button>
+                        <button
+                          onClick={() => handleAttachGroup("halogen", "Cl")}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#6C5CE7] text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#5B4BC7] transition-colors text-xs"
+                        >
+                          Attach -Cl
+                        </button>
+                        <button
+                          onClick={() => handleAttachGroup("halogen", "Br")}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-[#6C5CE7] text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#5B4BC7] transition-colors text-xs"
+                        >
+                          Attach -Br
+                        </button>
+                        <button
+                          onClick={handleRemoveGroup}
+                          disabled={!selectedNodeId}
+                          className="w-full px-3 py-1.5 bg-red-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-red-700 transition-colors text-xs"
+                        >
+                          Remove Group
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        // Check if canvas has meaningful content
+                        const hasContent = graph && graph.nodes.length > 1;
+
+                        if (hasContent) {
+                          showWarning(
+                            "Are you sure you want to reset? All work on the canvas will be cleared.",
+                            () => {
+                              loadTemplate("blank-canvas", undefined, true);
+                              setSelectedNodeId(null);
+                              setSelectedBondId(null);
+                              setCyclizeMode(false);
+                              setDraggingNodeId(null);
+                              setDragStart(null);
+                              setStructureName("");
+                              setStructureDescription("");
+                              setHasUnsavedChanges(false);
+                            },
+                            "Reset Canvas",
+                            "Reset"
+                          );
+                        } else {
+                          loadTemplate("blank-canvas", undefined, true);
+                          setSelectedNodeId(null);
+                          setSelectedBondId(null);
+                          setCyclizeMode(false);
+                          setDraggingNodeId(null);
+                          setDragStart(null);
+                          setStructureName("");
+                          setStructureDescription("");
+                          setHasUnsavedChanges(false);
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 bg-gray-600 text-white font-medium rounded hover:bg-gray-700 mt-2 transition-colors text-sm"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Right column - Preview and form */}
-          <div className="space-y-6">
-            {/* Preview */}
-            {selectedTemplate && (
-              <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-                <h2 className="text-xl font-bold text-white mb-4">Preview</h2>
-                <MoleculeViewer
-                  atoms={selectedTemplate.atoms}
-                  bonds={selectedTemplate.bonds}
-                  width={450}
-                  height={350}
-                  showHydrogens={false}
-                  scale={1.2}
-                />
-                <div className="mt-4 space-y-2 text-sm">
-                  <div>
-                    <span className="text-white/40">Formula:</span>
-                    <span className="text-white ml-2 font-mono">{selectedTemplate.molecularFormula}</span>
-                  </div>
-                  <div>
-                    <span className="text-white/40">Molecular Weight:</span>
-                    <span className="text-white ml-2">{selectedTemplate.molecularWeight.toFixed(2)} g/mol</span>
-                  </div>
-                  <div>
-                    <span className="text-white/40">Category:</span>
-                    <span className="text-white ml-2 capitalize">{selectedTemplate.category.replace("-", " ")}</span>
+              {/* Center Panel - Canvas */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+                  <h2 className="text-lg font-semibold mb-3 text-white text-center">Template Seeds</h2>
+
+                  <div className="flex justify-center items-center gap-2 flex-wrap mx-auto">
+                    {TEMPLATE_CATALOG.map((template) => (
+                      <button
+                        key={template.type}
+                        onClick={() => loadTemplate(template.type)}
+                        className={`px-2 py-1 rounded-lg transition-all font-light text-sm ${
+                          selectedTemplate === template.type
+                            ? "bg-[#00D9FF] text-gray-900 border-2 border-[#00C4E6]"
+                            : "bg-gray-700 text-gray-300 border-2 border-gray-600 hover:border-[#00D9FF] hover:bg-gray-600"
+                        }`}
+                        title={template.description}
+                      >
+                        {template.name}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Form */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Customize</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-white/60 text-sm mb-2">Name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter structure name"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]/50 focus:border-[#6C5CE7]/50"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-white/60 text-sm mb-2">Tags (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
-                    placeholder="organic, aromatic, template"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]/50 focus:border-[#6C5CE7]/50"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="isPublic"
-                    checked={isPublic}
-                    onChange={(e) => setIsPublic(e.target.checked)}
-                    className="w-5 h-5 bg-white/5 border border-white/10 rounded cursor-pointer"
-                  />
-                  <label htmlFor="isPublic" className="text-white cursor-pointer">
-                    Make this structure public
-                  </label>
-                </div>
-
-                {error && (
-                  <div className="px-4 py-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-300">
-                    {error}
+                {cyclizeMode && (
+                  <div className="bg-yellow-500 text-gray-900 px-4 py-3 border-b border-yellow-600">
+                    <p className="text-sm font-semibold text-center">
+                      Cyclize Mode: {cyclizeFirstNode ? "Select second node to form ring" : "Select first node"}
+                    </p>
                   </div>
                 )}
 
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleCreate}
-                  disabled={loading || !selectedTemplate}
-                  className="w-full px-6 py-3 bg-[#6C5CE7] text-white rounded-xl font-semibold hover:bg-[#5B4CD6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? "Creating..." : "Create Structure"}
-                </motion.button>
+                <div className="flex-1 flex items-center justify-center p-6">
+                  {graph && (
+                    <svg
+                      ref={svgRef}
+                      width="100%"
+                      height="100%"
+                      className="border border-gray-700 rounded"
+                      style={{ background: "#1A1A2E" }}
+                      onMouseMove={handleSvgMouseMove}
+                      onMouseUp={handleSvgMouseUp}
+                      onMouseLeave={handleSvgMouseUp}
+                      onClick={handleCanvasClick}
+                    >
+                      {graph &&
+                        graph.edges.map((edge) => {
+                          const fromNode = graph.nodes.find((n) => n.id === edge.from);
+                          const toNode = graph.nodes.find((n) => n.id === edge.to);
+                          if (!fromNode || !toNode) return null;
+
+                          const isSelected = edge.id === selectedBondId;
+
+                          // Calculate bond angle and perpendicular offset
+                          const dx = toNode.position.x - fromNode.position.x;
+                          const dy = toNode.position.y - fromNode.position.y;
+                          const length = Math.sqrt(dx * dx + dy * dy);
+                          const offsetX = -dy / length || 0; // Perpendicular X
+                          const offsetY = dx / length || 0; // Perpendicular Y
+
+                          // Bond colors
+                          const singleBondColor = "#FFFFFF"; // White
+                          const doubleBondColor = "#00D9FF"; // Cyan
+                          const tripleBondColor = "#A855F7"; // Purple
+
+                          const x1 = fromNode.position.x + 50;
+                          const y1 = fromNode.position.y + 50;
+                          const x2 = toNode.position.x + 50;
+                          const y2 = toNode.position.y + 50;
+
+                          return (
+                            <g key={edge.id}>
+                              {/* Invisible hitbox for better clicking */}
+                              <line
+                                x1={x1}
+                                y1={y1}
+                                x2={x2}
+                                y2={y2}
+                                stroke="transparent"
+                                strokeWidth={12}
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleBondClick(edge.id);
+                                }}
+                              />
+
+                              {edge.bondOrder === 1 && (
+                                <line
+                                  x1={x1}
+                                  y1={y1}
+                                  x2={x2}
+                                  y2={y2}
+                                  stroke={
+                                    isSelected ? "#f59e0b" : edge.bondType === "aromatic" ? "#8b5cf6" : singleBondColor
+                                  }
+                                  strokeWidth={isSelected ? 3 : 2}
+                                  pointerEvents="none"
+                                />
+                              )}
+                              {edge.bondOrder === 2 && (
+                                <>
+                                  <line
+                                    x1={x1 + offsetX * 3}
+                                    y1={y1 + offsetY * 3}
+                                    x2={x2 + offsetX * 3}
+                                    y2={y2 + offsetY * 3}
+                                    stroke={isSelected ? "#f59e0b" : doubleBondColor}
+                                    strokeWidth={isSelected ? 3 : 2}
+                                    pointerEvents="none"
+                                  />
+                                  <line
+                                    x1={x1 - offsetX * 3}
+                                    y1={y1 - offsetY * 3}
+                                    x2={x2 - offsetX * 3}
+                                    y2={y2 - offsetY * 3}
+                                    stroke={isSelected ? "#f59e0b" : doubleBondColor}
+                                    strokeWidth={isSelected ? 3 : 2}
+                                    pointerEvents="none"
+                                  />
+                                </>
+                              )}
+                              {edge.bondOrder === 3 && (
+                                <>
+                                  <line
+                                    x1={x1 + offsetX * 4}
+                                    y1={y1 + offsetY * 4}
+                                    x2={x2 + offsetX * 4}
+                                    y2={y2 + offsetY * 4}
+                                    stroke={isSelected ? "#f59e0b" : tripleBondColor}
+                                    strokeWidth={isSelected ? 3 : 2}
+                                    pointerEvents="none"
+                                  />
+                                  <line
+                                    x1={x1}
+                                    y1={y1}
+                                    x2={x2}
+                                    y2={y2}
+                                    stroke={isSelected ? "#f59e0b" : tripleBondColor}
+                                    strokeWidth={isSelected ? 3 : 2}
+                                    pointerEvents="none"
+                                  />
+                                  <line
+                                    x1={x1 - offsetX * 4}
+                                    y1={y1 - offsetY * 4}
+                                    x2={x2 - offsetX * 4}
+                                    y2={y2 - offsetY * 4}
+                                    stroke={isSelected ? "#f59e0b" : tripleBondColor}
+                                    strokeWidth={isSelected ? 3 : 2}
+                                    pointerEvents="none"
+                                  />
+                                </>
+                              )}
+                            </g>
+                          );
+                        })}
+
+                      {graph &&
+                        graph.nodes.map((node) => {
+                          const connectedEdges = graph.edges.filter((e) => e.from === node.id || e.to === node.id);
+                          const usedValency = connectedEdges.reduce((sum, e) => sum + e.bondOrder, 0);
+                          const maxValency =
+                            node.element === "C" ? 4 : node.element === "O" ? 2 : node.element === "N" ? 3 : 1;
+                          const isOverValency = usedValency > maxValency;
+                          const isSelected = node.id === selectedNodeId;
+                          const isCyclizeNode = cyclizeMode && node.id === cyclizeFirstNode;
+
+                          const colorMap: Record<string, string> = {
+                            C: "#000000",
+                            O: "#FF0000",
+                            N: "#0000FF",
+                            S: "#FFFF00",
+                            P: "#FFA500",
+                            F: "#90E050",
+                            Cl: "#1FF01F",
+                            Br: "#A62929",
+                            I: "#940094",
+                          };
+
+                          const isDragging = draggingNodeId === node.id;
+
+                          return (
+                            <g key={node.id}>
+                              <circle
+                                cx={node.position.x + 50}
+                                cy={node.position.y + 50}
+                                r={10}
+                                fill={colorMap[node.element] || "#404040"}
+                                stroke={
+                                  isSelected
+                                    ? "#f59e0b"
+                                    : isCyclizeNode
+                                    ? "#eab308"
+                                    : isOverValency
+                                    ? "#ef4444"
+                                    : "#FFFFFF"
+                                }
+                                strokeWidth={isSelected || isCyclizeNode ? 3 : 2}
+                                className={`${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+                                onMouseDown={(e) => {
+                                  handleNodeMouseDown(node.id, e);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!draggingNodeId) {
+                                    handleNodeClick(node.id);
+                                  }
+                                }}
+                              />
+
+                              <text
+                                x={node.position.x + 50}
+                                y={node.position.y + 50 + 4}
+                                textAnchor="middle"
+                                fontSize="12"
+                                fontWeight="bold"
+                                fill="#fff"
+                                pointerEvents="none"
+                              >
+                                {node.element}
+                              </text>
+
+                              {node.implicitHydrogens > 0 && (
+                                <text
+                                  x={node.position.x + 45}
+                                  y={node.position.y + 35}
+                                  fontSize="10"
+                                  fill="#22c55e"
+                                  fontWeight="bold"
+                                  pointerEvents="none"
+                                >
+                                  H{node.implicitHydrogens > 1 ? node.implicitHydrogens : ""}
+                                </text>
+                              )}
+                              {/* <text
+                            x={node.position.x + 50}
+                            y={node.position.y + 35}
+                            textAnchor="middle"
+                            fontSize="10"
+                            fill={isOverValency ? "#ef4444" : "#22c55e"}
+                            fontWeight="bold"
+                            pointerEvents="none"
+                          >
+                            {usedValency}/{maxValency}
+                          </text> */}
+                            </g>
+                          );
+                        })}
+                    </svg>
+                  )}
+                  {!graph && (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center text-gray-400">
+                        <svg
+                          className="w-24 h-24 mx-auto mb-4 opacity-50"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+                          />
+                        </svg>
+                        <p className="text-lg font-medium mb-2">Select a Template Seed</p>
+                        <p className="text-sm">Choose a template from above to start building your organic structure</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+
+              {/* Right Panel - Derived Properties */}
+              <div className="w-96 bg-gray-800 border-l border-gray-700 overflow-y-auto">
+                <div className="p-4">
+                  <h2 className="text-lg font-bold mb-4 text-white">Derived Properties</h2>
+
+                  {graph && structure && (
+                    <div className="space-y-3">
+                      <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
+                        <h3 className="text-xs font-semibold text-gray-400 mb-1">IUPAC Name</h3>
+                        <p className="text-base font-medium text-white break-words">{structure.derived.iupacName}</p>
+                      </div>
+
+                      <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
+                        <h3 className="text-xs font-semibold text-gray-400 mb-1">Molecular Formula</h3>
+                        <p className="text-xl font-bold text-white">{structure.derived.molecularFormula}</p>
+                      </div>
+
+                      <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
+                        <h3 className="text-xs font-semibold text-gray-400 mb-1">Molecular Weight</h3>
+                        <p className="text-base text-white">{structure.derived.molecularWeight.toFixed(2)} g/mol</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
+                          <h3 className="text-xs font-semibold text-gray-400 mb-1">Total Atoms</h3>
+                          <p className="text-base text-white">{structure.derived.totalAtoms}</p>
+                        </div>
+
+                        <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
+                          <h3 className="text-xs font-semibold text-gray-400 mb-1">Carbon Count</h3>
+                          <p className="text-base text-white">{structure.derived.carbonCount}</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
+                        <h3 className="text-xs font-semibold text-gray-400 mb-2">Functional Groups</h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          {detectFunctionalGroups(graph).map((group, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-block px-2 py-0.5 bg-[#6C5CE7] text-white text-xs font-medium rounded"
+                            >
+                              {group.name}
+                            </span>
+                          ))}
+                          {detectFunctionalGroups(graph).length === 0 && (
+                            <p className="text-xs text-gray-400">None detected</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-700 rounded-lg p-3 border border-gray-600">
+                        <h3 className="text-xs font-semibold text-gray-400 mb-2">Validation</h3>
+                        <div
+                          className={`p-2 rounded ${
+                            structure.validation.isValid
+                              ? "bg-green-900/30 border border-green-600"
+                              : "bg-red-900/30 border border-red-600"
+                          }`}
+                        >
+                          <p
+                            className={`text-xs font-semibold ${
+                              structure.validation.isValid ? "text-green-400" : "text-red-400"
+                            }`}
+                          >
+                            {structure.validation.isValid ? "✓ Valid Structure" : "✗ Invalid Structure"}
+                          </p>
+                          {structure.validation.errors.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {structure.validation.errors.map((error, idx) => (
+                                <p key={idx} className="text-xs text-red-300">
+                                  {error}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                          {structure.validation.warnings.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {structure.validation.warnings.map((warning, idx) => (
+                                <p key={idx} className="text-xs text-yellow-300">
+                                  {warning}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-gray-700 space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Structure Name <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={structureName}
+                            onChange={(e) => setStructureName(e.target.value)}
+                            placeholder="e.g., Ethanol, Benzene, etc."
+                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Description (Optional)
+                          </label>
+                          <textarea
+                            value={structureDescription}
+                            onChange={(e) => setStructureDescription(e.target.value)}
+                            placeholder="Add notes about this structure..."
+                            rows={2}
+                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] resize-none"
+                          />
+                        </div>
+
+                        <button
+                          onClick={handleSaveStructure}
+                          disabled={!structure.validation.isValid || !structureName.trim() || isSaving}
+                          className="w-full px-4 py-3 bg-[#6C5CE7] text-white font-semibold rounded hover:bg-[#5B4BC7] disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {isSaving ? "Saving..." : "Save Structure"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          }
         </div>
       </div>
     </div>
