@@ -121,28 +121,6 @@ export default function OrganicStructureDetailPage() {
                 scale={1.2}
               />
             </div>
-
-            {/* Metadata */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 mt-6">
-              <h2 className="text-xl font-bold text-white mb-4">Metadata</h2>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-white/40">Created by:</span>
-                  <span className="text-white ml-2">{structure.createdByName}</span>
-                </div>
-                <div>
-                  <span className="text-white/40">Visibility:</span>
-                  <span className="text-white ml-2">{structure.isPublic ? "Public" : "Private"}</span>
-                </div>
-                {structure.isTemplate && (
-                  <div>
-                    <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-lg">
-                      Template
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Right column - Properties */}

@@ -20,7 +20,9 @@ Complete reference for all API endpoints in the Reaction Hub application.
 
 **Base Route:** `/api/auth/[...nextauth]`
 
-**Provider:** Google OAuth 2.0
+**Providers:**
+- Google OAuth 2.0 (all users)
+- Microsoft Azure AD (organizational accounts only)
 
 #### Configuration
 - **NextAuth Adapter:** MongoDB Adapter
@@ -30,16 +32,43 @@ Complete reference for all API endpoints in the Reaction Hub application.
   - Error: `/login`
 
 #### Features
+- Dual OAuth providers (Google + Microsoft)
 - Account selection prompt on every sign-in (`prompt: "select_account"`)
+- Email domain validation for Microsoft SSO
 - Session includes user ID in callbacks
 - Debug mode enabled in development
+- Comprehensive error messages with actionable suggestions
 
 #### Environment Variables Required
+
+**General (Required for all):**
 ```env
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=your-secret-key
+```
+
+**Google OAuth:**
+```env
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
+NEXT_PUBLIC_GOOGLE_OAUTH_CONFIGURED=true
+```
+
+**Microsoft Azure AD:**
+```env
+AZURE_AD_CLIENT_ID=your-azure-client-id
+AZURE_AD_CLIENT_SECRET=your-azure-client-secret
+AZURE_AD_TENANT_ID=common
+NEXT_PUBLIC_MICROSOFT_OAUTH_CONFIGURED=true
+```
+
+**Email Domain Restrictions (Microsoft SSO):**
+```env
+# Optional: Whitelist specific organizational domains
+ALLOWED_EMAIL_DOMAINS=university.edu,company.com
+
+# Blocklist: Personal Microsoft account domains (default if not set)
+BLOCKED_EMAIL_DOMAINS=outlook.com,hotmail.com,live.com,msn.com,passport.com
 ```
 
 #### Built-in NextAuth Endpoints
@@ -48,12 +77,71 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 |--------|----------|-------------|
 | GET | `/api/auth/signin` | Displays sign-in page |
 | POST | `/api/auth/signin/google` | Initiates Google OAuth flow |
-| GET/POST | `/api/auth/callback/google` | OAuth callback handler |
+| POST | `/api/auth/signin/azure-ad` | Initiates Microsoft OAuth flow |
+| GET/POST | `/api/auth/callback/google` | Google OAuth callback handler |
+| GET/POST | `/api/auth/callback/azure-ad` | Microsoft OAuth callback handler |
 | GET | `/api/auth/signout` | Signs out user |
 | POST | `/api/auth/signout` | Confirms sign out |
 | GET | `/api/auth/session` | Returns current session |
 | GET | `/api/auth/csrf` | Returns CSRF token |
 | GET | `/api/auth/providers` | Lists configured providers |
+
+#### Email Validation (Microsoft SSO)
+
+Microsoft SSO includes automatic email validation to ensure only organizational accounts can access the application.
+
+**Validation Rules:**
+1. **Blocklist Check:** Rejects personal Microsoft accounts (@outlook.com, @hotmail.com, @live.com, @msn.com, @passport.com)
+2. **Whitelist Check:** If `ALLOWED_EMAIL_DOMAINS` is configured, only those domains are allowed
+3. **Default Behavior:** If no whitelist is configured, all organizational emails are allowed (personal accounts still blocked)
+
+**Example Validation Flow:**
+```
+User logs in with: student@university.edu
+↓
+Check blocklist: ❌ Not in blocklist
+↓
+Check whitelist (if configured): ✅ In whitelist OR no whitelist configured
+↓
+Result: ✅ Login allowed
+```
+
+```
+User logs in with: user@outlook.com
+↓
+Check blocklist: ✅ Found in blocklist (personal account)
+↓
+Result: ❌ Login rejected with error code "personal_account"
+```
+
+#### Authentication Error Codes
+
+The authentication system returns specific error codes for different failure scenarios:
+
+| Error Code | Severity | Description | When It Occurs |
+|------------|----------|-------------|----------------|
+| `personal_account` | Error (Red) | Personal Microsoft account blocked | User tries to login with @outlook.com, @hotmail.com, etc. |
+| `domain_not_authorized` | Error (Red) | Email domain not in whitelist | Domain not authorized when whitelist is configured |
+| `access_denied` | Warning (Yellow) | User cancelled OAuth flow | User clicks "Cancel" on OAuth consent screen |
+| `configuration` | Error (Red) | OAuth credentials invalid | Azure AD/Google OAuth misconfigured |
+| `provider_error` | Error (Red) | OAuth provider issue | Microsoft/Google service error or email not provided |
+| `verification` | Error (Red) | Verification link invalid | Email verification failed (if implemented) |
+| `callback` | Error (Red) | OAuth callback failed | Redirect URI mismatch or state validation failed |
+| `session_required` | Info (Blue) | Session expired | User session timeout |
+| `network_error` | Warning (Yellow) | Connection problem | Cannot reach authentication server |
+| `default` | Error (Red) | Unknown error | Unexpected authentication failure |
+
+**Error Response Format:**
+```
+/login?error=personal_account&message=Personal%20Microsoft%20accounts%20are%20not%20allowed
+```
+
+**Error Display:**
+Each error shows:
+- **Title:** Clear identification of the error type
+- **Message:** Detailed explanation
+- **Suggestion:** Actionable next steps
+- **Visual Indicator:** Color-coded severity (red/yellow/blue) with icons
 
 ---
 
@@ -582,6 +670,8 @@ Cookie: next-auth.session-token=...
 
 ## Error Handling
 
+### API Error Format
+
 All endpoints follow a consistent error response format:
 
 ```json
@@ -591,6 +681,26 @@ All endpoints follow a consistent error response format:
   "details": "Additional error details (optional)"
 }
 ```
+
+### Authentication Error Format
+
+Authentication errors use URL query parameters for user-facing display:
+
+```
+/login?error=error_code&message=Custom%20error%20message
+```
+
+**Error Components:**
+- `error` - Error code (e.g., `personal_account`, `access_denied`)
+- `message` - Custom error message (URL encoded, optional)
+
+**Display Format:**
+Each authentication error includes:
+- **Title**: Clear error type identification
+- **Message**: Detailed explanation
+- **Suggestion**: Actionable next steps
+- **Severity**: Color-coded (Red/Yellow/Blue)
+- **Icon**: Visual indicator (Error ❌, Warning ⚠️, Info ℹ️, Lock 🔒)
 
 ### Common Error Scenarios
 
@@ -602,7 +712,7 @@ All endpoints follow a consistent error response format:
 }
 ```
 
-#### 2. Authentication Errors
+#### 2. API Authentication Errors
 ```json
 {
   "success": false,
@@ -610,7 +720,45 @@ All endpoints follow a consistent error response format:
 }
 ```
 
-#### 3. Validation Errors
+#### 3. OAuth Authentication Errors
+
+**Personal Microsoft Account Blocked:**
+```
+/login?error=personal_account&message=Personal%20Microsoft%20accounts%20are%20not%20allowed
+```
+Display: 🔒 Red error with suggestion to use school/work email
+
+**Domain Not Authorized:**
+```
+/login?error=domain_not_authorized&message=Your%20email%20domain%20is%20not%20authorized
+```
+Display: 🔒 Red error with suggestion to contact administrator
+
+**User Cancelled Login:**
+```
+/login?error=access_denied
+```
+Display: ⚠️ Yellow warning with suggestion to try again
+
+**Configuration Error:**
+```
+/login?error=configuration
+```
+Display: ❌ Red error indicating OAuth setup issue
+
+**Provider Error:**
+```
+/login?error=provider_error&message=Microsoft%20did%20not%20provide%20an%20email%20address
+```
+Display: ❌ Red error with suggestion to try different sign-in method
+
+**Session Expired:**
+```
+/login?error=session_required
+```
+Display: ℹ️ Blue info message to sign in again
+
+#### 4. Validation Errors
 ```json
 {
   "success": false,
@@ -618,13 +766,27 @@ All endpoints follow a consistent error response format:
 }
 ```
 
-#### 4. Not Found Errors
+#### 5. Not Found Errors
 ```json
 {
   "success": false,
   "error": "Element with symbol \"Xx\" not found"
 }
 ```
+
+### Error Code Reference
+
+See [Authentication Error Codes](#authentication-error-codes) section for complete list of authentication error codes, severity levels, and when they occur.
+
+**Key Authentication Error Codes:**
+- `personal_account` - Personal Microsoft account rejected
+- `domain_not_authorized` - Email domain not in whitelist
+- `access_denied` - User cancelled OAuth flow
+- `configuration` - OAuth credentials invalid
+- `provider_error` - OAuth service error
+- `callback` - OAuth callback failed
+- `session_required` - Session expired
+- `network_error` - Connection problem
 
 ---
 
@@ -659,46 +821,192 @@ All endpoints follow a consistent error response format:
 
 ## Authentication Flow
 
-### 1. Client Initiates Sign-In
+### Google OAuth Flow
+
+#### 1. Client Initiates Sign-In
 ```javascript
 import { signIn } from "next-auth/react"
 
-signIn("google")
+// Sign in with Google
+signIn("google", { callbackUrl: "/" })
 ```
 
-### 2. OAuth Flow
+#### 2. OAuth Flow
 1. Redirects to Google OAuth consent screen
 2. User selects account (forced by `prompt: "select_account"`)
 3. User grants permissions
 4. Redirects to `/api/auth/callback/google`
 
-### 3. Session Creation
+#### 3. Session Creation
 - NextAuth creates database session via MongoDB Adapter
 - Session cookie set automatically
 - User ID added to session in callback
 
-### 4. Protected API Calls
+---
+
+### Microsoft OAuth Flow (with Email Validation)
+
+#### 1. Client Initiates Sign-In
 ```javascript
-// Client-side
+import { signIn } from "next-auth/react"
+
+// Sign in with Microsoft
+signIn("azure-ad", { callbackUrl: "/" })
+```
+
+#### 2. OAuth Flow
+1. Redirects to Microsoft OAuth consent screen
+2. User signs in with Microsoft account
+3. User grants permissions
+4. Redirects to `/api/auth/callback/azure-ad`
+
+#### 3. Email Validation (Server-Side)
+```javascript
+// In NextAuth signIn callback
+if (account?.provider === "azure-ad") {
+  const email = user.email
+  const domain = email.split('@')[1]?.toLowerCase()
+
+  // Check 1: Block personal accounts
+  if (['outlook.com', 'hotmail.com', 'live.com'].includes(domain)) {
+    return `/login?error=personal_account&message=...`
+  }
+
+  // Check 2: Validate against whitelist (if configured)
+  if (ALLOWED_EMAIL_DOMAINS && !ALLOWED_EMAIL_DOMAINS.includes(domain)) {
+    return `/login?error=domain_not_authorized&message=...`
+  }
+
+  // Approved: Continue with session creation
+  return true
+}
+```
+
+#### 4. Session Creation (if approved)
+- NextAuth creates database session via MongoDB Adapter
+- Session cookie set automatically
+- User ID added to session in callback
+
+#### 5. Rejection Flow (if blocked)
+- User redirected to `/login` with error code
+- Error message displayed with:
+  - Title (e.g., "Personal Account Not Allowed")
+  - Message (e.g., "Personal Microsoft accounts are not permitted...")
+  - Suggestion (e.g., "Use your school or work email instead")
+  - Visual indicator (Red lock icon)
+
+---
+
+### Protected API Calls
+
+#### Client-Side
+```javascript
 import { useSession } from "next-auth/react"
 
-const { data: session } = useSession()
+const { data: session, status } = useSession()
 
+// Check authentication status
+if (status === "loading") {
+  return <div>Loading...</div>
+}
+
+if (status === "unauthenticated") {
+  router.push("/login")
+  return null
+}
+
+// Make authenticated request
 if (session) {
-  fetch("/api/compounds", {
+  const response = await fetch("/api/compounds", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(compoundData)
+    body: JSON.stringify(compoundData),
+    credentials: "include" // Include session cookie
   })
-}
 
-// Server-side (in API route)
+  if (response.status === 401) {
+    // Session expired, redirect to login
+    router.push("/login?error=session_required")
+  }
+}
+```
+
+#### Server-Side (API Route)
+```javascript
 import { getServerSession } from "next-auth"
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 
-const session = await getServerSession(authOptions)
-if (!session) {
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export async function POST(req: Request) {
+  // Get session
+  const session = await getServerSession(authOptions)
+
+  // Check authentication
+  if (!session || !session.user) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    )
+  }
+
+  // Session exists - proceed with authenticated logic
+  const userId = session.user.id
+  const userEmail = session.user.email
+
+  // ... your protected logic here
 }
+```
+
+---
+
+### Testing Authentication
+
+#### Test Google Login
+```bash
+# Visit login page
+http://localhost:3000/login
+
+# Click "Sign in with Google"
+# Complete OAuth flow
+# Should redirect to home page
+```
+
+#### Test Microsoft Login (Organizational Account)
+```bash
+# Visit login page
+http://localhost:3000/login
+
+# Click "Sign in with Microsoft"
+# Use: student@university.edu
+# Should succeed and redirect to home page
+```
+
+#### Test Microsoft Login (Personal Account - Should Fail)
+```bash
+# Visit login page
+http://localhost:3000/login
+
+# Click "Sign in with Microsoft"
+# Use: user@outlook.com
+# Should show error: "Personal Microsoft accounts are not allowed"
+```
+
+#### Test Email Whitelist
+```bash
+# Set in .env.local
+ALLOWED_EMAIL_DOMAINS=university.edu
+
+# Restart server
+npm run dev
+
+# Try: student@university.edu → ✅ Should work
+# Try: employee@company.com → ❌ Should be blocked
+```
+
+#### Test Email Validation Script
+```bash
+# Test configuration without logging in
+node scripts/test-email-validation.js student@university.edu
+node scripts/test-email-validation.js user@outlook.com
 ```
 
 ---
