@@ -94,7 +94,7 @@ export function validateValence(graph: MoleculeGraph): { isValid: boolean; error
 
     // Create user-friendly element identifier
     const elementCount = elementCounts.get(node.element) || 1;
-    let elementLabel = node.element;
+    let elementLabel: string = node.element;
 
     if (elementCount > 1) {
       // Multiple of same element - add index

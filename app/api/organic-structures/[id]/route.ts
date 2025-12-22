@@ -57,8 +57,8 @@ export async function GET(
   }
 }
 
-// PATCH update organic structure by ID (requires authentication and ownership)
-export async function PATCH(
+// PUT update organic structure by ID (requires authentication and ownership)
+export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -69,7 +69,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
-          error: "Unauthorized - Please sign in to update structures",
+          error: "Unauthorized",
         },
         { status: 401 }
       );
@@ -83,6 +83,35 @@ export async function PATCH(
         {
           success: false,
           error: "Invalid structure ID",
+        },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const {
+      name,
+      iupacName,
+      commonName,
+      category,
+      smiles,
+      atoms,
+      bonds,
+      functionalGroups,
+      molecularFormula,
+      molecularWeight,
+      renderData,
+      isPublic,
+      tags,
+      logP,
+      pKa,
+    } = body;
+
+    if (!name || !atoms || atoms.length === 0 || !bonds) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Missing required fields",
         },
         { status: 400 }
       );
@@ -113,22 +142,39 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
-
     // Update the structure
     const updatedStructure = await OrganicStructureModel.findByIdAndUpdate(
       id,
-      { $set: body },
+      {
+        name,
+        iupacName: iupacName || null,
+        commonName: commonName || null,
+        category,
+        smiles,
+        atoms,
+        bonds,
+        functionalGroups: functionalGroups || [],
+        molecularFormula,
+        molecularWeight,
+        renderData: renderData || null,
+        isPublic: isPublic !== undefined ? isPublic : true,
+        tags: tags || [],
+        logP: logP !== undefined ? logP : null,
+        pKa: pKa !== undefined ? pKa : null,
+      },
       { new: true, runValidators: true }
     ).lean();
 
-    return NextResponse.json({
-      success: true,
-      structure: {
-        ...updatedStructure,
-        id: updatedStructure!._id.toString(),
+    return NextResponse.json(
+      {
+        success: true,
+        structure: {
+          ...updatedStructure,
+          id: updatedStructure!._id.toString(),
+        },
       },
-    });
+      { status: 200 }
+    );
   } catch (error: any) {
     console.error("Error updating organic structure:", error);
 

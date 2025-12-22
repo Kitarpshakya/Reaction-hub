@@ -88,7 +88,7 @@ const OrganicStructureSchema = new Schema<OrganicStructure>(
     },
 
     // Structure representation
-    smiles: { type: String, required: true },
+    smiles: { type: String, required: false }, // Optional - auto-generated from graph
     molFile: { type: String },
     inchi: { type: String },
 

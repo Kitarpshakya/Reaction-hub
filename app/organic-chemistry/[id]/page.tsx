@@ -5,7 +5,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useModal } from "@/lib/contexts/ModalContext";
 import { OrganicStructure } from "@/lib/types/organic";
 import MoleculeViewer from "@/components/organic/MoleculeViewer";
 
@@ -13,11 +12,9 @@ export default function OrganicStructureDetailPage() {
   const { data: session } = useSession();
   const params = useParams();
   const router = useRouter();
-  const { showConfirm, showError } = useModal();
   const [structure, setStructure] = useState<OrganicStructure | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -42,34 +39,9 @@ export default function OrganicStructureDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleEdit = () => {
     if (!structure) return;
-
-    showConfirm(
-      "Are you sure you want to delete this structure? This action cannot be undone.",
-      async () => {
-        setDeleting(true);
-        try {
-          const res = await fetch(`/api/organic-structures/${structure.id || structure._id}`, {
-            method: "DELETE",
-          });
-
-          if (res.ok) {
-            router.push("/organic-chemistry");
-          } else {
-            const data = await res.json();
-            showError(data.error || "Failed to delete structure");
-          }
-        } catch (error) {
-          console.error("Error deleting structure:", error);
-          showError("Failed to delete structure");
-        } finally {
-          setDeleting(false);
-        }
-      },
-      "Delete Structure",
-      "Delete"
-    );
+    router.push(`/organic-chemistry/${structure.id || structure._id}/edit`);
   };
 
   if (loading) {
@@ -105,22 +77,11 @@ export default function OrganicStructureDetailPage() {
         {/* Header with actions */}
         <div className="flex justify-between items-start mb-8">
           <div>
-            <Link
-              href="/organic-chemistry"
-              className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-4"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back to Library
-            </Link>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">{structure.name}</h1>
             {structure.commonName && structure.commonName !== structure.name && (
               <p className="text-xl text-white/60 mb-2">{structure.commonName}</p>
             )}
-            {structure.iupacName && (
-              <p className="text-sm text-white/40">IUPAC: {structure.iupacName}</p>
-            )}
+            {structure.iupacName && <p className="text-sm text-white/40">IUPAC: {structure.iupacName}</p>}
           </div>
 
           {/* Action buttons */}
@@ -129,11 +90,18 @@ export default function OrganicStructureDetailPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 py-2 bg-red-500/20 text-red-300 rounded-xl font-semibold hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                onClick={handleEdit}
+                className="px-6 py-3 bg-[#6C5CE7] text-white rounded-xl font-semibold hover:bg-[#5B4CD6] transition-colors flex items-center gap-2"
               >
-                {deleting ? "Deleting..." : "Delete"}
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+                Edit Structure
               </motion.button>
             </div>
           )}
@@ -206,7 +174,7 @@ export default function OrganicStructureDetailPage() {
 
             {/* Chemical Properties */}
             {(structure.logP !== null && structure.logP !== undefined) ||
-             (structure.pKa !== null && structure.pKa !== undefined) ? (
+            (structure.pKa !== null && structure.pKa !== undefined) ? (
               <div className="bg-white/5 border border-white/10 rounded-xl p-6">
                 <h2 className="text-xl font-bold text-white mb-4">Chemical Properties</h2>
                 <div className="space-y-3">
@@ -232,10 +200,7 @@ export default function OrganicStructureDetailPage() {
                 <h2 className="text-xl font-bold text-white mb-4">Functional Groups</h2>
                 <div className="flex flex-wrap gap-2">
                   {structure.functionalGroups.map((fg, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-2 bg-white/10 text-white rounded-lg text-sm"
-                    >
+                    <span key={index} className="px-3 py-2 bg-white/10 text-white rounded-lg text-sm">
                       {fg.name}
                     </span>
                   ))}
@@ -249,10 +214,7 @@ export default function OrganicStructureDetailPage() {
                 <h2 className="text-xl font-bold text-white mb-4">Tags</h2>
                 <div className="flex flex-wrap gap-2">
                   {structure.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-2 bg-[#6C5CE7]/20 text-[#6C5CE7] rounded-lg text-sm"
-                    >
+                    <span key={index} className="px-3 py-2 bg-[#6C5CE7]/20 text-[#6C5CE7] rounded-lg text-sm">
                       #{tag}
                     </span>
                   ))}

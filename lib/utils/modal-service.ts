@@ -20,7 +20,9 @@ class ModalService {
 
   subscribe(listener: ModalListener) {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   private emit(event: ModalEvent) {

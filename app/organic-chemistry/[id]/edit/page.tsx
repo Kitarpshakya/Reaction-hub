@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useModal } from "@/lib/contexts/ModalContext";
 import {
   MoleculeGraph,
@@ -48,10 +48,11 @@ interface OrganicStructure {
   };
 }
 
-export default function OrganicStructurePage() {
+export default function EditOrganicStructurePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { showAlert, showError, showSuccess, showWarning } = useModal();
+  const params = useParams();
+  const { showAlert, showError, showWarning } = useModal();
   const [selectedTemplate, setSelectedTemplate] = useState<string>("blank-canvas");
   const [graph, setGraph] = useState<MoleculeGraph | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -66,17 +67,82 @@ export default function OrganicStructurePage() {
   const [structureDescription, setStructureDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [structureId, setStructureId] = useState<string>("");
+  const [originalStructure, setOriginalStructure] = useState<any>(null);
+  const [originalGraph, setOriginalGraph] = useState<MoleculeGraph | null>(null);
+  const [showSuccessSnackbar, setShowSuccessSnackbar] = useState(false);
 
+  // Fetch existing structure data
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/login?callbackUrl=/organic-chemistry/create");
+      router.push(`/login?callbackUrl=/organic-chemistry/edit/${params.id}`);
+      return;
     }
-  }, [status, router]);
+
+    if (status === "authenticated" && params.id) {
+      fetchStructure(params.id as string);
+    }
+  }, [status, params.id, router]);
+
+  const fetchStructure = async (id: string) => {
+    try {
+      const res = await fetch(`/api/organic-structures/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        const structure = data.structure;
+
+        // Check if user is the owner
+        if (session?.user?.id !== structure.createdBy) {
+          showError("You don't have permission to edit this structure");
+          router.push(`/organic-chemistry/${id}`);
+          return;
+        }
+
+        setOriginalStructure(structure);
+        setStructureId(id);
+        setStructureName(structure.name);
+        setStructureDescription(structure.commonName || "");
+
+        // Reconstruct graph from atoms and bonds
+        const reconstructedGraph: MoleculeGraph = {
+          nodes: structure.atoms.map((atom: any) => ({
+            id: atom.id,
+            element: atom.element,
+            position: { x: atom.position.x, y: atom.position.y },
+            hybridization: atom.hybridization || "sp3",
+            implicitHydrogens: 0,
+          })),
+          edges: structure.bonds.map((bond: any) => ({
+            id: bond.id,
+            from: bond.from,
+            to: bond.to,
+            bondOrder: bond.type === "triple" ? 3 : bond.type === "double" ? 2 : 1,
+            bondType: bond.type === "aromatic" ? "aromatic" : "sigma",
+          })),
+        };
+
+        // Recalculate implicit hydrogens
+        updateImplicitHydrogens(reconstructedGraph);
+        updateHybridization(reconstructedGraph);
+
+        setGraph(reconstructedGraph);
+        setOriginalGraph(JSON.parse(JSON.stringify(reconstructedGraph))); // Deep copy for reset
+        setIsLoading(false);
+      } else {
+        showError("Structure not found");
+        router.push("/organic-chemistry");
+      }
+    } catch (error) {
+      console.error("Error fetching structure:", error);
+      showError("Failed to load structure");
+      router.push("/organic-chemistry");
+    }
+  };
 
   const loadTemplate = useCallback(
     (templateId: string, length?: number, skipWarning = false) => {
-      // Check if canvas has meaningful content (more than just blank canvas)
-      // Blank canvas typically has 1 carbon node
+      // Check if canvas has meaningful content
       const hasContent = graph && graph.nodes.length > 1;
 
       if (!skipWarning && hasContent) {
@@ -97,7 +163,6 @@ export default function OrganicStructurePage() {
       const template = TEMPLATE_CATALOG.find((t) => t.type === templateId);
       if (!template) return;
 
-      // Use createTemplate instead of template.factory()
       const params = { chainLength: length || chainLength };
       let initialGraph = createTemplate(template.type, params);
 
@@ -108,20 +173,10 @@ export default function OrganicStructurePage() {
       setCyclizeMode(false);
       setDraggingNodeId(null);
       setDragStart(null);
-      setHasUnsavedChanges(false);
+      setHasUnsavedChanges(true);
     },
     [chainLength, graph, showWarning]
   );
-
-  // Load blank canvas by default on mount
-  useEffect(() => {
-    if (status === "authenticated" && !graph) {
-      const initialGraph = createTemplate("blank-canvas");
-      setGraph(initialGraph);
-      setSelectedTemplate("blank-canvas");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
 
   const getStructure = useCallback((): OrganicStructure | null => {
     if (!graph) return null;
@@ -178,16 +233,14 @@ export default function OrganicStructurePage() {
     }
   }, [graph, selectedNodeId, showError]);
 
-  // Helper function to check if a bond is part of a cycle
   const isBondInCycle = useCallback(
     (bondFrom: string, bondTo: string): boolean => {
       if (!graph) return false;
 
-      // Create adjacency list excluding the bond we're checking
       const adjacency: Map<string, string[]> = new Map();
       graph.edges.forEach((edge) => {
         if ((edge.from === bondFrom && edge.to === bondTo) || (edge.from === bondTo && edge.to === bondFrom)) {
-          return; // Skip this bond
+          return;
         }
 
         if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
@@ -196,14 +249,13 @@ export default function OrganicStructurePage() {
         adjacency.get(edge.to)!.push(edge.from);
       });
 
-      // BFS to check if there's still a path between the two nodes
       const visited = new Set<string>();
       const queue = [bondFrom];
       visited.add(bondFrom);
 
       while (queue.length > 0) {
         const current = queue.shift()!;
-        if (current === bondTo) return true; // Found alternate path = cycle exists
+        if (current === bondTo) return true;
 
         const neighbors = adjacency.get(current) || [];
         for (const neighbor of neighbors) {
@@ -214,7 +266,7 @@ export default function OrganicStructurePage() {
         }
       }
 
-      return false; // No alternate path = bond is not in cycle
+      return false;
     },
     [graph]
   );
@@ -225,7 +277,6 @@ export default function OrganicStructurePage() {
       const bond = graph.edges.find((e) => e.id === selectedBondId);
       if (!bond) return;
 
-      // Prevent modification of aromatic bonds
       if (bond.bondType === "aromatic") {
         showAlert("Cannot modify aromatic bonds. Aromatic ring structure is fixed.", "Aromatic Bond");
         return;
@@ -237,7 +288,6 @@ export default function OrganicStructurePage() {
       }
 
       if (targetOrder > bond.bondOrder) {
-        // Increasing bond order (unsaturate)
         let currentGraph = graph;
         for (let i = bond.bondOrder; i < targetOrder; i++) {
           const result = unsaturateBond(currentGraph, bond.from, bond.to);
@@ -250,7 +300,6 @@ export default function OrganicStructurePage() {
         setGraph(currentGraph);
         setHasUnsavedChanges(true);
       } else {
-        // Decreasing bond order (saturate)
         let currentGraph = graph;
         for (let i = bond.bondOrder; i > targetOrder; i--) {
           const result = saturateBond(currentGraph, bond.from, bond.to);
@@ -272,13 +321,11 @@ export default function OrganicStructurePage() {
     const bond = graph.edges.find((e) => e.id === selectedBondId);
     if (!bond) return;
 
-    // Prevent removal of aromatic bonds
     if (bond.bondType === "aromatic") {
       showAlert("Cannot remove aromatic bonds. Aromatic ring structure is fixed.", "Aromatic Bond");
       return;
     }
 
-    // Only allow removal if bond is part of a cycle
     if (!isBondInCycle(bond.from, bond.to)) {
       showAlert(
         "Cannot remove bond: Bond must be part of a cycle (ring structure). Removing this bond would break the molecule.",
@@ -287,7 +334,6 @@ export default function OrganicStructurePage() {
       return;
     }
 
-    // First reduce to single bond if not already
     if (bond.bondOrder > 1) {
       let currentGraph = graph;
       for (let i = bond.bondOrder; i > 1; i--) {
@@ -300,17 +346,14 @@ export default function OrganicStructurePage() {
       }
       setGraph(currentGraph);
       setHasUnsavedChanges(true);
-      // Don't remove yet, let user confirm by clicking again
       return;
     }
 
-    // Remove the bond
     const updatedGraph = {
       ...graph,
       edges: graph.edges.filter((e) => e.id !== selectedBondId),
     };
 
-    // Recalculate implicit hydrogens
     updateImplicitHydrogens(updatedGraph);
 
     setGraph(updatedGraph);
@@ -401,19 +444,16 @@ export default function OrganicStructurePage() {
     [cyclizeMode]
   );
 
-  // Helper: Detect if node is part of an aromatic ring
   const getAromaticRingNodes = useCallback(
     (nodeId: string): string[] | null => {
       if (!graph) return null;
 
-      // Check if node has any aromatic bonds
       const aromaticBonds = graph.edges.filter(
         (e) => e.bondType === "aromatic" && (e.from === nodeId || e.to === nodeId)
       );
 
       if (aromaticBonds.length === 0) return null;
 
-      // BFS to find all connected aromatic nodes
       const aromaticNodes = new Set<string>([nodeId]);
       const queue = [nodeId];
       const visited = new Set<string>([nodeId]);
@@ -441,7 +481,7 @@ export default function OrganicStructurePage() {
 
   const handleNodeMouseDown = useCallback(
     (nodeId: string, e: React.MouseEvent<SVGCircleElement>) => {
-      if (cyclizeMode) return; // Don't drag in cyclize mode
+      if (cyclizeMode) return;
 
       e.stopPropagation();
       setDraggingNodeId(nodeId);
@@ -471,19 +511,15 @@ export default function OrganicStructurePage() {
       const dx = svgP.x - dragStart.x;
       const dy = svgP.y - dragStart.y;
 
-      // Get dynamic SVG dimensions
       const svgRect = svg.getBoundingClientRect();
-      const maxX = svgRect.width - 100; // Leave margin for node radius + offset
+      const maxX = svgRect.width - 100;
       const maxY = svgRect.height - 100;
 
-      // Check if dragging node is part of aromatic ring
       const aromaticRingNodes = getAromaticRingNodes(draggingNodeId);
 
-      // Update node position
       const updatedGraph = {
         ...graph,
         nodes: graph.nodes.map((node) => {
-          // If dragging aromatic node, move entire ring together
           if (aromaticRingNodes && aromaticRingNodes.includes(node.id)) {
             return {
               ...node,
@@ -492,9 +528,7 @@ export default function OrganicStructurePage() {
                 y: Math.max(0, Math.min(maxY, node.position.y + dy)),
               },
             };
-          }
-          // Otherwise only move the dragged node
-          else if (node.id === draggingNodeId) {
+          } else if (node.id === draggingNodeId) {
             return {
               ...node,
               position: {
@@ -514,12 +548,15 @@ export default function OrganicStructurePage() {
   );
 
   const handleSvgMouseUp = useCallback(() => {
+    if (draggingNodeId && dragStart) {
+      // Node was dragged, mark as unsaved change
+      setHasUnsavedChanges(true);
+    }
     setDraggingNodeId(null);
     setDragStart(null);
-  }, []);
+  }, [draggingNodeId, dragStart]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    // Only deselect if clicking directly on SVG (not on nodes/bonds)
     if (e.target === e.currentTarget) {
       setSelectedNodeId(null);
       setSelectedBondId(null);
@@ -542,7 +579,6 @@ export default function OrganicStructurePage() {
         return;
       }
 
-      // Transform graph to API format
       const atoms = graph.nodes.map((node) => ({
         id: node.id,
         element: node.element,
@@ -555,7 +591,6 @@ export default function OrganicStructurePage() {
         charge: 0,
       }));
 
-      // Map internal bond types to API-valid enum values
       const mapBondType = (bondOrder: number, bondType: string): string => {
         if (bondType === "aromatic") return "aromatic";
         if (bondOrder === 3) return "triple";
@@ -575,7 +610,6 @@ export default function OrganicStructurePage() {
         position: group.nodeIds?.map((_, i) => i) || [],
       }));
 
-      // Determine category based on structure
       const detectedGroups = detectFunctionalGroups(graph);
       const hasAromatic = graph.edges.some((e) => e.bondType === "aromatic");
       const hasDoubleBond = graph.edges.some((e) => e.bondOrder === 2 && e.bondType !== "aromatic");
@@ -609,7 +643,6 @@ export default function OrganicStructurePage() {
         smilesString = getSMILESByFormula(structure.derived.molecularFormula);
       }
 
-      // Prepare payload
       const payload = {
         name: structureName.trim(),
         iupacName: structure.derived.iupacName,
@@ -627,12 +660,12 @@ export default function OrganicStructurePage() {
           showHydrogens: false,
           colorScheme: "cpk",
         },
-        isPublic: true,
-        tags: [],
+        isPublic: originalStructure?.isPublic ?? true,
+        tags: originalStructure?.tags || [],
       };
 
-      const response = await fetch("/api/organic-structures", {
-        method: "POST",
+      const response = await fetch(`/api/organic-structures/${structureId}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
@@ -642,26 +675,36 @@ export default function OrganicStructurePage() {
       const data = await response.json();
 
       if (data.success) {
-        showSuccess("Structure saved successfully!");
-        setStructureName("");
-        setStructureDescription("");
+        setShowSuccessSnackbar(true);
         setHasUnsavedChanges(false);
-        // Optionally redirect to the structure detail page
-        router.push(`/organic-chemistry/${data.structure.id}`);
+        // Redirect after showing snackbar
+        setTimeout(() => {
+          router.push(`/organic-chemistry/${structureId}`);
+        }, 1500);
       } else {
-        showError(`Failed to save structure: ${data.error}`);
+        showError(`Failed to update structure: ${data.error}`);
       }
     } catch (error) {
-      console.error("Error saving structure:", error);
-      showError("An error occurred while saving the structure");
+      console.error("Error updating structure:", error);
+      showError("An error occurred while updating the structure");
     } finally {
       setIsSaving(false);
     }
-  }, [graph, structureName, structureDescription, getStructure, router, showAlert, showError, showSuccess]);
+  }, [
+    graph,
+    structureName,
+    structureDescription,
+    getStructure,
+    router,
+    showAlert,
+    showError,
+    structureId,
+    originalStructure,
+  ]);
 
   const structure = getStructure();
 
-  if (status === "loading") {
+  if (status === "loading" || isLoading) {
     return (
       <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6C5CE7]"></div>
@@ -675,6 +718,18 @@ export default function OrganicStructurePage() {
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E]">
+      {/* Success Snackbar */}
+      {showSuccessSnackbar && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+          <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="font-medium">Structure updated successfully!</span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col h-[calc(100vh-3.5rem)]">
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">
@@ -757,7 +812,7 @@ export default function OrganicStructurePage() {
                           <button
                             onClick={() => handleSetBondOrder(1)}
                             disabled={!selectedBondId}
-                            className="cursor-pointer px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
+                            className="px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
                             title="Set to single bond"
                           >
                             Single
@@ -765,7 +820,7 @@ export default function OrganicStructurePage() {
                           <button
                             onClick={() => handleSetBondOrder(2)}
                             disabled={!selectedBondId}
-                            className="cursor-pointer px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
+                            className="px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
                             title="Set to double bond"
                           >
                             Double
@@ -773,7 +828,7 @@ export default function OrganicStructurePage() {
                           <button
                             onClick={() => handleSetBondOrder(3)}
                             disabled={!selectedBondId}
-                            className="cursor-pointer px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
+                            className="px-2 py-1.5 bg-green-600 text-white font-medium rounded disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-green-700 transition-colors text-xs"
                             title="Set to triple bond"
                           >
                             Triple
@@ -847,41 +902,29 @@ export default function OrganicStructurePage() {
 
                     <button
                       onClick={() => {
-                        // Check if canvas has meaningful content
-                        const hasContent = graph && graph.nodes.length > 1;
-
-                        if (hasContent) {
-                          showWarning(
-                            "Are you sure you want to reset? All work on the canvas will be cleared.",
-                            () => {
-                              loadTemplate("blank-canvas", undefined, true);
+                        showWarning(
+                          "Are you sure you want to reset? All changes will be discarded and the structure will be restored to its original state.",
+                          () => {
+                            if (originalGraph) {
+                              // Deep copy the original graph to restore it
+                              const restoredGraph = JSON.parse(JSON.stringify(originalGraph));
+                              setGraph(restoredGraph);
                               setSelectedNodeId(null);
                               setSelectedBondId(null);
                               setCyclizeMode(false);
                               setDraggingNodeId(null);
                               setDragStart(null);
-                              setStructureName("");
-                              setStructureDescription("");
                               setHasUnsavedChanges(false);
-                            },
-                            "Reset Canvas",
-                            "Reset"
-                          );
-                        } else {
-                          loadTemplate("blank-canvas", undefined, true);
-                          setSelectedNodeId(null);
-                          setSelectedBondId(null);
-                          setCyclizeMode(false);
-                          setDraggingNodeId(null);
-                          setDragStart(null);
-                          setStructureName("");
-                          setStructureDescription("");
-                          setHasUnsavedChanges(false);
-                        }
+                            }
+                          },
+                          "Reset to Original",
+                          "Reset"
+                        );
                       }}
-                      className="w-full px-3 py-1.5 bg-gray-600 text-white font-medium rounded hover:bg-gray-700 mt-2 transition-colors text-sm"
+                      disabled={!originalGraph || !hasUnsavedChanges}
+                      className="cursor-pointer w-full px-3 py-1.5 bg-gray-600 text-white font-medium rounded hover:bg-gray-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed mt-2 transition-colors text-sm"
                     >
-                      Reset
+                      Reset to Original
                     </button>
                   </div>
                 </div>
@@ -889,26 +932,6 @@ export default function OrganicStructurePage() {
 
               {/* Center Panel - Canvas */}
               <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-                  <h2 className="text-lg font-semibold mb-3 text-white text-center">Template Seeds</h2>
-
-                  <div className="flex justify-center items-center gap-2 flex-wrap mx-auto">
-                    {TEMPLATE_CATALOG.map((template) => (
-                      <button
-                        key={template.type}
-                        onClick={() => loadTemplate(template.type)}
-                        className={`cursor-pointer px-2 py-1 rounded-lg transition-all font-light text-sm ${
-                          selectedTemplate === template.type
-                            ? "bg-[#00D9FF] text-gray-900 border-2 border-[#00C4E6]"
-                            : "bg-gray-700 text-gray-300 border-2 border-gray-600 hover:border-[#00D9FF] hover:bg-gray-600"
-                        }`}
-                        title={template.description}
-                      >
-                        {template.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
                 {cyclizeMode && (
                   <div className="bg-yellow-500 text-gray-900 px-4 py-3 border-b border-yellow-600">
                     <p className="text-sm font-semibold text-center">
@@ -938,17 +961,15 @@ export default function OrganicStructurePage() {
 
                           const isSelected = edge.id === selectedBondId;
 
-                          // Calculate bond angle and perpendicular offset
                           const dx = toNode.position.x - fromNode.position.x;
                           const dy = toNode.position.y - fromNode.position.y;
                           const length = Math.sqrt(dx * dx + dy * dy);
-                          const offsetX = -dy / length || 0; // Perpendicular X
-                          const offsetY = dx / length || 0; // Perpendicular Y
+                          const offsetX = -dy / length || 0;
+                          const offsetY = dx / length || 0;
 
-                          // Bond colors
-                          const singleBondColor = "#FFFFFF"; // White
-                          const doubleBondColor = "#00D9FF"; // Cyan
-                          const tripleBondColor = "#A855F7"; // Purple
+                          const singleBondColor = "#FFFFFF";
+                          const doubleBondColor = "#00D9FF";
+                          const tripleBondColor = "#A855F7";
 
                           const x1 = fromNode.position.x + 50;
                           const y1 = fromNode.position.y + 50;
@@ -957,7 +978,6 @@ export default function OrganicStructurePage() {
 
                           return (
                             <g key={edge.id}>
-                              {/* Invisible hitbox for better clicking */}
                               <line
                                 x1={x1}
                                 y1={y1}
@@ -1119,17 +1139,6 @@ export default function OrganicStructurePage() {
                                   H{node.implicitHydrogens > 1 ? node.implicitHydrogens : ""}
                                 </text>
                               )}
-                              {/* <text
-                            x={node.position.x + 50}
-                            y={node.position.y + 35}
-                            textAnchor="middle"
-                            fontSize="10"
-                            fill={isOverValency ? "#ef4444" : "#22c55e"}
-                            fontWeight="bold"
-                            pointerEvents="none"
-                          >
-                            {usedValency}/{maxValency}
-                          </text> */}
                             </g>
                           );
                         })}
@@ -1151,8 +1160,7 @@ export default function OrganicStructurePage() {
                             d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
                           />
                         </svg>
-                        <p className="text-lg font-medium mb-2">Select a Template Seed</p>
-                        <p className="text-sm">Choose a template from above to start building your organic structure</p>
+                        <p className="text-lg font-medium mb-2">Loading structure...</p>
                       </div>
                     </div>
                   )}
@@ -1257,7 +1265,7 @@ export default function OrganicStructurePage() {
                             value={structureName}
                             onChange={(e) => setStructureName(e.target.value)}
                             placeholder="e.g., Ethanol, Benzene, etc."
-                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
+                            className="cursor-pointer w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]"
                           />
                         </div>
 
@@ -1268,16 +1276,16 @@ export default function OrganicStructurePage() {
                             onChange={(e) => setStructureDescription(e.target.value)}
                             placeholder="Add notes about this structure..."
                             rows={2}
-                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] resize-none"
+                            className="cursor-pointer w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#6C5CE7] resize-none"
                           />
                         </div>
 
                         <button
                           onClick={handleSaveStructure}
-                          disabled={!structure.validation.isValid || isSaving}
+                          disabled={!structure.validation.isValid || !structureName.trim() || isSaving}
                           className="cursor-pointer w-full px-4 py-3 bg-[#6C5CE7] text-white font-semibold rounded hover:bg-[#5B4BC7] disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
                         >
-                          {isSaving ? "Saving..." : "Save Structure"}
+                          {isSaving ? "Updating..." : "Update Structure"}
                         </button>
                       </div>
                     </div>

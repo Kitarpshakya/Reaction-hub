@@ -40,23 +40,21 @@ export {
 export type { DerivedProperties, ValidationSummary, DetectedFunctionalGroup };
 
 /**
- * Generate SMILES string (simplified version)
+ * Generate SMILES string (basic implementation)
  * SMILES = Simplified Molecular Input Line Entry System
- * Note: This is a basic implementation. For production, use RDKit.js
+ * Note: For complex molecules and canonical SMILES, use RDKit.js
  */
 export function generateSMILES(graph: MoleculeGraph): string | null {
-  if (graph.nodes.length === 0) return null;
+  // Import and use the dedicated SMILES generator
+  const { generateSMILES: generateSMILESString } = require('./organic-smiles');
 
-  // This is a placeholder for SMILES generation
-  // Full implementation requires traversal algorithm with:
-  // - Depth-first traversal
-  // - Ring closure notation
-  // - Branching notation
-  // - Bond order notation
-  // - Stereochemistry notation
-
-  // For now, return null (to be implemented with RDKit.js)
-  return null;
+  try {
+    const smiles = generateSMILESString(graph);
+    return smiles || null;
+  } catch (error) {
+    console.error('Error generating SMILES:', error);
+    return null;
+  }
 }
 
 /**
