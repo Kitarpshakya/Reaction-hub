@@ -20,7 +20,9 @@
       "Bash(node -e:*)",
       "Bash(rm:*)",
       "Bash(rmdir:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(node test-bond-angles.js:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

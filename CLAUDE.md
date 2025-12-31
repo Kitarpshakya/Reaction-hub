@@ -15,13 +15,26 @@ Interactive periodic table and compound management app with 3D visualizations, i
 
 ## Documentation Structure
 
-This project's documentation is split into focused files:
+This project's documentation is organized as follows:
 
+**Root Documentation:**
+- **[README.md](./README.md)** - Project readme (public-facing)
 - **[CLAUDE.md](./CLAUDE.md)** (this file) - Project overview and structure
-- **[AUTH.md](./AUTH.md)** - Authentication setup and configuration
-- **[PERIODIC_TABLE.md](./PERIODIC_TABLE.md)** - Periodic table and element details
-- **[COMPOUND.md](./COMPOUND.md)** - Compound builder specifications
-- **[ORGANIC.md](./ORGANIC.md)** - Organic chemistry builder specifications
+
+**Feature Documentation** (`docs/features/`):
+- **[AUTH.md](./docs/features/AUTH.md)** - Authentication setup and configuration
+- **[PERIODIC_TABLE.md](./docs/features/PERIODIC_TABLE.md)** - Periodic table and element details
+- **[COMPOUND.md](./docs/features/COMPOUND.md)** - Compound builder specifications
+- **[ORGANIC.md](./docs/features/ORGANIC.md)** - Organic chemistry builder specifications
+
+**API Documentation:**
+- **[API.md](./docs/API.md)** - Complete API reference
+
+**User Guides** (`docs/guides/`):
+- **[COMPOUND_BONDING_GUIDE.md](./docs/guides/COMPOUND_BONDING_GUIDE.md)** - Detailed bonding system guide
+
+**Archive** (`docs/archive/`):
+- Implementation logs and verification reports
 
 ## Project Structure
 

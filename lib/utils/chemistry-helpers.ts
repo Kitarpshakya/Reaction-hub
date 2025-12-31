@@ -109,9 +109,9 @@ export function getValence(element: Element): number {
     Be: 2, Mg: 2, Ca: 2, Sr: 2, Ba: 2, Ra: 2,
     B: 3, Al: 3, Ga: 3, In: 3, Tl: 3,
     C: 4, Si: 4, Ge: 4, Sn: 4, Pb: 4,
-    N: 3, P: 3, As: 3, Sb: 3, Bi: 3,
-    O: 2, S: 2, Se: 2, Te: 2, Po: 2,
-    F: 1, Cl: 1, Br: 1, I: 1, At: 1,
+    N: 3, P: 5, As: 5, Sb: 5, Bi: 5, // P can form 5 bonds (e.g., H₃PO₄)
+    O: 2, S: 6, Se: 6, Te: 6, Po: 6, // S can form 6 bonds (e.g., H₂SO₄)
+    F: 1, Cl: 7, Br: 7, I: 7, At: 7, // Halogens can expand (e.g., ClO₄⁻)
     He: 0, Ne: 0, Ar: 0, Kr: 0, Xe: 0, Rn: 0,
     Fe: 3, Cu: 2, Zn: 2, Ag: 1, Au: 3,
     Ni: 2, Co: 2, Cr: 3, Mn: 2, Ti: 4,

@@ -2,7 +2,7 @@
 
 import { Suspense, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Environment } from "@react-three/drei";
 import { Element } from "@/lib/types/element";
 import * as THREE from "three";
 
@@ -20,13 +20,15 @@ interface ElectronShellProps {
 function Electron({ position, color }: { position: [number, number, number]; color: string }) {
   return (
     <mesh position={position}>
-      <sphereGeometry args={[0.15, 16, 16]} />
-      <meshStandardMaterial
+      <sphereGeometry args={[0.15, 32, 32]} />
+      <meshPhysicalMaterial
         color="#60A5FA"
         emissive="#60A5FA"
-        emissiveIntensity={0.5}
-        metalness={0.3}
-        roughness={0.2}
+        emissiveIntensity={0.3}
+        metalness={0.5}
+        roughness={0.3}
+        clearcoat={0.5}
+        clearcoatRoughness={0.2}
       />
     </mesh>
   );
@@ -77,13 +79,15 @@ function ElectronShell({ radius, electrons, shellIndex, color }: ElectronShellPr
 function Nucleon({ position, type }: { position: [number, number, number]; type: 'proton' | 'neutron' }) {
   return (
     <mesh position={position}>
-      <sphereGeometry args={[0.35, 16, 16]} />
-      <meshStandardMaterial
+      <sphereGeometry args={[0.35, 32, 32]} />
+      <meshPhysicalMaterial
         color={type === 'proton' ? '#F87171' : '#A78BFA'}
         emissive={type === 'proton' ? '#F87171' : '#A78BFA'}
-        emissiveIntensity={0.4}
-        roughness={0.3}
+        emissiveIntensity={0.2}
+        roughness={0.4}
         metalness={0.6}
+        clearcoat={0.3}
+        clearcoatRoughness={0.3}
       />
     </mesh>
   );
@@ -161,11 +165,42 @@ function AtomModel({ element }: { element: Element }) {
 
   return (
     <>
-      {/* Softer, more ambient lighting */}
-      <ambientLight intensity={0.8} />
-      <pointLight position={[15, 15, 15]} intensity={0.8} color="#ffffff" />
-      <pointLight position={[-10, -10, -10]} intensity={0.4} color="#93C5FD" />
-      <pointLight position={[0, -15, 0]} intensity={0.3} color="#A78BFA" />
+      {/* Enhanced Lighting for 3D Depth */}
+      <ambientLight intensity={0.4} />
+      <hemisphereLight
+        args={["#ffffff", "#444444", 0.6]}
+      />
+
+      {/* Main Key Light (creates primary highlight and shadows) */}
+      <directionalLight
+        position={[10, 10, 10]}
+        intensity={1.2}
+        color="#ffffff"
+        castShadow={false}
+      />
+
+      {/* Fill Light (softens shadows on dark side) */}
+      <pointLight
+        position={[-8, 5, -8]}
+        intensity={0.6}
+        color="#ffffff"
+      />
+
+      {/* Rim Light (creates edge highlights for depth) */}
+      <pointLight
+        position={[0, -10, 10]}
+        intensity={0.5}
+        color="#b3d9ff"
+      />
+
+      {/* Top Light (enhances glossy appearance) */}
+      <spotLight
+        position={[0, 15, 0]}
+        angle={0.6}
+        penumbra={0.5}
+        intensity={0.8}
+        color="#ffffff"
+      />
 
       {/* Nucleus */}
       <Nucleus protons={element.atomicNumber} neutrons={neutrons} color={element.color} />
@@ -180,6 +215,9 @@ function AtomModel({ element }: { element: Element }) {
           color={element.color}
         />
       ))}
+
+      {/* Environment Map for Reflections */}
+      <Environment preset="studio" />
 
       {/* Camera Controls */}
       <OrbitControls
@@ -216,15 +254,15 @@ export default function BohrModel3D({ element }: BohrModel3DProps) {
         <div className="text-white font-bold text-base md:text-lg mb-2">{element.name}</div>
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-2 h-2 rounded-full bg-red-500 shadow-sm shadow-red-500/50"></div>
+            <div className="w-2 h-2 rounded-full bg-red-400 shadow-sm shadow-red-400/50"></div>
             <span className="text-gray-300">{element.atomicNumber} Protons</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></div>
+            <div className="w-2 h-2 rounded-full bg-purple-400 shadow-sm shadow-purple-400/50"></div>
             <span className="text-gray-300">{neutrons} Neutrons</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-2 h-2 rounded-full bg-white shadow-sm shadow-white/30"></div>
+            <div className="w-2 h-2 rounded-full bg-blue-400 shadow-sm shadow-blue-400/50"></div>
             <span className="text-gray-300">{element.electronsPerShell.reduce((a, b) => a + b, 0)} Electrons</span>
           </div>
         </div>
@@ -233,6 +271,15 @@ export default function BohrModel3D({ element }: BohrModel3DProps) {
       <Canvas
         camera={{ position: [18, 12, 18], fov: 45 }}
         className="w-full h-full"
+        shadows={false}
+        dpr={[1, 2]}
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: "high-performance",
+          toneMapping: 2, // ACESFilmicToneMapping
+          toneMappingExposure: 1.2
+        }}
       >
         <Suspense fallback={<LoadingFallback />}>
           <AtomModel element={element} />

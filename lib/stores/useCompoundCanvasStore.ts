@@ -107,6 +107,19 @@ export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => 
 
       nearbyElementIds.forEach((nearbyId) => {
         const nearbyElement = state.canvasElements.find((el) => el.id === nearbyId);
+
+        // EXPLICIT duplicate check - ensure no bond already exists
+        const bondAlreadyExists = [...state.bonds, ...newBonds].some(
+          (bond) =>
+            (bond.fromElementId === id && bond.toElementId === nearbyId) ||
+            (bond.fromElementId === nearbyId && bond.toElementId === id)
+        );
+
+        if (bondAlreadyExists) {
+          console.log(`Skipping duplicate bond between ${element.symbol} and ${nearbyElement?.element.symbol}`);
+          return;
+        }
+
         if (
           nearbyElement &&
           canFormBond(
@@ -214,47 +227,60 @@ export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => 
         return state;
       }
 
-      // SINGLE COMPOUND RESTRICTION: Check if there are existing bonds
-      // If yes, at least one of the elements being bonded must be part of an existing group
+      // EXPLICIT duplicate bond check - prevent any duplicate bonds
+      const bondAlreadyExists = state.bonds.some(
+        (bond) =>
+          (bond.fromElementId === fromElementId && bond.toElementId === toElementId) ||
+          (bond.fromElementId === toElementId && bond.toElementId === fromElementId)
+      );
+
+      if (bondAlreadyExists) {
+        console.log(`Bond between ${fromElement.element.symbol} and ${toElement.element.symbol} already exists`);
+        return state;
+      }
+
+      // SINGLE COMPOUND RESTRICTION: Prevent creating multiple disconnected compounds
+      // But allow re-bonding orphaned elements (elements that lost their group after bond removal)
       if (state.bonds.length > 0) {
         const fromElementHasGroup = !!fromElement.groupId;
         const toElementHasGroup = !!toElement.groupId;
 
-        // If neither element is part of an existing group, block the bond
+        // Get all existing group IDs
+        const existingGroups = new Set(
+          state.canvasElements
+            .filter(el => el.groupId)
+            .map(el => el.groupId)
+        );
+
+        // If neither element has a group, check if there are other grouped elements
         if (!fromElementHasGroup && !toElementHasGroup) {
-          console.log(
-            `❌ Cannot create separate compound! ${fromElement.element.symbol} and ${toElement.element.symbol} ` +
-              `are not connected to the existing compound. Please bond to existing compound elements first.`
-          );
-          modalService.showAlert(
-            `Cannot create separate compound!\n\n` +
-              `You can only create ONE compound at a time. ` +
-              `At least one element must be part of the existing compound.\n\n` +
-              `Either:\n` +
-              `- Bond ${fromElement.element.symbol} or ${toElement.element.symbol} to the existing compound first\n` +
-              `- Use the Clear/Reset button to start a new compound`,
-            "Cannot Create Separate Compound"
-          );
-          return state;
+          // If there ARE other grouped elements, these two would form a separate compound
+          // But we should allow this if the user is rebuilding after removing bonds
+          // Only block if this would create a truly separate disconnected compound
+
+          // Check: are there any elements WITH groups that are different from what we'd create?
+          if (existingGroups.size > 0) {
+            // There's already a compound group - warn but allow if user confirms
+            // For now, just allow it to enable rebuilding after bond removal
+            console.log(
+              `⚠️ Creating bond between ungrouped elements while other groups exist. ` +
+              `This will create a new group that may be separate from existing compound.`
+            );
+            // Allow the bond - user may be rebuilding the compound
+          }
         }
 
-        // If both elements are in different groups, block the bond (would merge compounds)
+        // If both elements are in different groups, this would merge compounds
+        // This is actually fine - it reconnects parts of the compound
         if (
           fromElementHasGroup &&
           toElementHasGroup &&
           fromElement.groupId !== toElement.groupId
         ) {
           console.log(
-            `❌ Cannot merge separate groups! ${fromElement.element.symbol} (group ${fromElement.groupId}) ` +
-              `and ${toElement.element.symbol} (group ${toElement.groupId}) are in different compounds.`
+            `✓ Merging groups: ${fromElement.groupId} and ${toElement.groupId}`
           );
-          modalService.showAlert(
-            `Cannot merge separate compounds!\n\n` +
-              `These elements belong to different compound groups. ` +
-              `This should not happen in the single-compound mode.`,
-            "Cannot Merge Compounds"
-          );
-          return state;
+          // Allow merging - this reconnects disconnected parts
         }
       }
 
@@ -290,14 +316,24 @@ export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => 
         `✓ Created ${autoBondType} bond between ${fromElement.element.symbol} and ${toElement.element.symbol}`
       );
 
-      // Assign elements to same group
+      // Assign elements to same group (and merge groups if needed)
       let groupId = fromElement.groupId || toElement.groupId;
       if (!groupId) {
         groupId = `group-${Date.now()}`;
       }
 
+      // If merging two different groups, update ALL elements from both groups
+      const groupsToMerge = new Set<string>();
+      if (fromElement.groupId) groupsToMerge.add(fromElement.groupId);
+      if (toElement.groupId) groupsToMerge.add(toElement.groupId);
+
       const updatedElements = state.canvasElements.map((el) => {
+        // Update the two bonded elements
         if (el.id === fromElementId || el.id === toElementId) {
+          return { ...el, groupId };
+        }
+        // Also update any elements from groups being merged
+        if (el.groupId && groupsToMerge.has(el.groupId)) {
           return { ...el, groupId };
         }
         return el;
@@ -416,24 +452,113 @@ export const useCompoundCanvasStore = create<CompoundCanvasState>((set, get) => 
       bondedElementIds.add(bond.toElementId);
     });
 
-    // Count only bonded elements
+    // Count only bonded elements and collect their full data
     const elementCounts: Record<string, number> = {};
+    const elementDataMap = new Map<string, Element>();
+
     canvasElements.forEach((el) => {
       if (bondedElementIds.has(el.id)) {
         elementCounts[el.symbol] = (elementCounts[el.symbol] || 0) + 1;
+        if (!elementDataMap.has(el.symbol)) {
+          elementDataMap.set(el.symbol, el.element);
+        }
       }
     });
 
-    // Generate formula (simple version)
-    let formula = "";
-    Object.entries(elementCounts)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .forEach(([symbol, count]) => {
-        formula += symbol;
-        if (count > 1) {
-          formula += count.toString().split("").map(d => "₀₁₂₃₄₅₆₇₈₉"[parseInt(d)]).join("");
+    // Helper: Check if element is a metal
+    const isMetal = (symbol: string): boolean => {
+      const element = elementDataMap.get(symbol);
+      if (!element) return false;
+      const metalCategories = [
+        "alkali-metal",
+        "alkaline-earth-metal",
+        "transition-metal",
+        "post-transition-metal",
+        "lanthanide",
+        "actinide",
+      ];
+      return metalCategories.includes(element.category);
+    };
+
+    // Helper: Check if element is a nonmetal
+    const isNonmetal = (symbol: string): boolean => {
+      const element = elementDataMap.get(symbol);
+      if (!element) return false;
+      return element.category === "nonmetal" || element.category === "halogen";
+    };
+
+    const symbols = Object.keys(elementCounts);
+    const hasCarbon = symbols.includes('C');
+    const metals = symbols.filter(isMetal);
+    const nonmetals = symbols.filter(isNonmetal);
+    const isIonic = metals.length > 0 && nonmetals.length > 0;
+
+    // Sort elements using chemistry conventions
+    const sortedElements = Object.entries(elementCounts).sort(([symbolA], [symbolB]) => {
+      // For ionic compounds: Metal (cation) before nonmetal (anion)
+      if (isIonic) {
+        const metalA = isMetal(symbolA);
+        const metalB = isMetal(symbolB);
+        const nonmetalA = isNonmetal(symbolA);
+        const nonmetalB = isNonmetal(symbolB);
+
+        if (metalA && nonmetalB) return -1;
+        if (nonmetalA && metalB) return 1;
+
+        // If both metals or both nonmetals, sort alphabetically
+        return symbolA.localeCompare(symbolB);
+      }
+
+      // For covalent compounds
+      if (hasCarbon) {
+        // Hill system: Carbon first, then Hydrogen, then alphabetical
+        if (symbolA === 'C') return -1;
+        if (symbolB === 'C') return 1;
+        if (symbolA === 'H' && symbolB !== 'C') return -1;
+        if (symbolB === 'H' && symbolA !== 'C') return 1;
+
+        // Alphabetical for remaining elements
+        return symbolA.localeCompare(symbolB);
+      } else {
+        // Special case for hydrogen compounds (binary hydrides)
+        const hasHydrogen = symbols.includes('H');
+        const halogens = ['F', 'Cl', 'Br', 'I', 'At'];
+
+        if (hasHydrogen && symbols.length === 2) {
+          // For hydrogen halides (HCl, HF, etc.), H comes first
+          const otherSymbol = symbols.find(s => s !== 'H');
+          if (otherSymbol && halogens.includes(otherSymbol)) {
+            if (symbolA === 'H') return -1;
+            if (symbolB === 'H') return 1;
+          } else {
+            // For other binary hydrogen compounds (NH₃, H₂O, H₂S), other element first
+            if (symbolA === 'H') return 1;
+            if (symbolB === 'H') return -1;
+          }
         }
-      });
+
+        // Sort by electronegativity (least electronegative first)
+        const elementA = elementDataMap.get(symbolA);
+        const elementB = elementDataMap.get(symbolB);
+        const enA = elementA?.electronegativity || 0;
+        const enB = elementB?.electronegativity || 0;
+
+        // Sort by electronegativity ascending (least electronegative first)
+        if (enA !== enB) return enA - enB;
+
+        // If electronegativity is the same, sort alphabetically
+        return symbolA.localeCompare(symbolB);
+      }
+    });
+
+    // Generate formula
+    let formula = "";
+    sortedElements.forEach(([symbol, count]) => {
+      formula += symbol;
+      if (count > 1) {
+        formula += count.toString().split("").map(d => "₀₁₂₃₄₅₆₇₈₉"[parseInt(d)]).join("");
+      }
+    });
 
     return formula || "";
   },

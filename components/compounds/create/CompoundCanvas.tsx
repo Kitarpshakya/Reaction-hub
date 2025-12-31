@@ -85,6 +85,19 @@ export default function CompoundCanvas() {
       // Try to bond with nearby elements
       nearbyElementIds.forEach((nearbyId) => {
         const nearbyElement = canvasElements.find((el) => el.id === nearbyId);
+
+        // Check if bond already exists to prevent duplicates
+        const bondAlreadyExists = bonds.some(
+          (bond) =>
+            (bond.fromElementId === elementId && bond.toElementId === nearbyId) ||
+            (bond.fromElementId === nearbyId && bond.toElementId === elementId)
+        );
+
+        if (bondAlreadyExists) {
+          console.log(`Bond already exists between ${draggedElement.element.symbol} and ${nearbyElement?.element.symbol}`);
+          return;
+        }
+
         if (
           nearbyElement &&
           canFormBond(
