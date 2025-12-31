@@ -314,9 +314,12 @@ function generateIonicFormula(
 // COVALENT COMPOUND FORMULA GENERATION
 // ============================================================================
 
-function generateCovalentFormula(elementCounts: Record<string, number>): string {
+function generateCovalentFormula(
+  elementCounts: Record<string, number>,
+  elementMap: Map<string, Element>
+): string {
   let formula = "";
-  const symbols = Object.keys(elementCounts).sort();
+  const symbols = Object.keys(elementCounts);
   const hasCarbon = symbols.includes("C");
 
   if (hasCarbon) {
@@ -327,12 +330,45 @@ function generateCovalentFormula(elementCounts: Record<string, number>): string 
     }
     symbols
       .filter(s => s !== "C" && s !== "H")
+      .sort() // Alphabetical for remaining elements
       .forEach(symbol => {
         formula += symbol + (elementCounts[symbol] > 1 ? subscript(elementCounts[symbol]) : "");
       });
   } else {
-    // Alphabetical
-    symbols.forEach(symbol => {
+    // Special case for hydrogen compounds (binary hydrides)
+    const hasHydrogen = symbols.includes('H');
+    const halogens = ['F', 'Cl', 'Br', 'I', 'At'];
+
+    const sortedSymbols = symbols.sort((a, b) => {
+      // For binary hydrogen compounds
+      if (hasHydrogen && symbols.length === 2) {
+        // For hydrogen halides (HCl, HF, etc.), H comes first
+        const otherSymbol = symbols.find(s => s !== 'H');
+        if (otherSymbol && halogens.includes(otherSymbol)) {
+          if (a === 'H') return -1;
+          if (b === 'H') return 1;
+        } else {
+          // For other binary hydrogen compounds (NH₃, H₂O, H₂S), other element first
+          if (a === 'H') return 1;
+          if (b === 'H') return -1;
+        }
+      }
+
+      // Sort by electronegativity (least electronegative first)
+      // This ensures SO2, NO2, etc. are formatted correctly
+      const elementA = elementMap.get(a);
+      const elementB = elementMap.get(b);
+      const enA = elementA?.electronegativity || 0;
+      const enB = elementB?.electronegativity || 0;
+
+      // Sort by electronegativity ascending (least electronegative first)
+      if (enA !== enB) return enA - enB;
+
+      // If electronegativity is the same, sort alphabetically
+      return a.localeCompare(b);
+    });
+
+    sortedSymbols.forEach(symbol => {
       formula += symbol + (elementCounts[symbol] > 1 ? subscript(elementCounts[symbol]) : "");
     });
   }
@@ -592,7 +628,7 @@ export function validateCompound(
       };
     }
   } else {
-    formula = generateCovalentFormula(elementCounts);
+    formula = generateCovalentFormula(elementCounts, elementMap);
   }
 
   // Generate IUPAC name

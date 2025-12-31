@@ -3,6 +3,7 @@ export interface CompoundElement {
   symbol: string; // "H", "O"
   count: number; // Number of atoms (2 for H in H₂O)
   position?: { x: number; y: number }; // Position on canvas (Phase 3)
+  position3D?: { x: number; y: number; z: number }; // 3D coordinates for visualization
 }
 
 // Phase 3: Chemical Bonds
@@ -15,6 +16,17 @@ export interface Bond {
 }
 
 export type BondType = "single" | "double" | "triple" | "ionic" | "covalent" | "metallic";
+
+// VSEPR Geometry Types (for 3D visualization)
+export type VSEPRGeometry =
+  | "linear"              // 2 atoms, 180°
+  | "bent"                // 2-3 atoms, ~104.5° (water) or ~120° (SO2)
+  | "trigonal-planar"     // 3 atoms, 120°
+  | "tetrahedral"         // 4 atoms, 109.5°
+  | "trigonal-pyramidal"  // 4 atoms, ~107° (ammonia)
+  | "trigonal-bipyramidal" // 5 atoms, 90°/120°
+  | "octahedral"          // 6 atoms, 90°
+  | "custom";             // Fallback for complex molecules
 
 // Phase 3: External Factors
 export interface ExternalFactors {
@@ -52,6 +64,14 @@ export interface CanvasData {
   offset: { x: number; y: number };
 }
 
+// Molecular Geometry Metadata (for 3D visualization)
+export interface MolecularGeometry {
+  type: VSEPRGeometry;
+  centralAtomId?: string;      // ID of central atom (if applicable)
+  bondAngles?: number[];        // Bond angles in degrees
+  generatedAt?: Date;           // When 3D coords were generated
+}
+
 export interface Compound {
   _id?: string;
   name: string; // "Water", "Carbon Dioxide"
@@ -68,6 +88,7 @@ export interface Compound {
   bonds?: Bond[]; // Chemical bonds between elements
   externalFactors?: ExternalFactors; // Reaction conditions
   canvasData?: CanvasData; // Element positions on canvas
+  geometry?: MolecularGeometry; // 3D geometry metadata
 
   // User info
   createdBy: string; // User ID

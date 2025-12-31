@@ -8,7 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Element } from "@/lib/types/element";
 import { validateCompound } from "@/lib/utils/chemical-validation";
 import ValidationPanel from "@/components/compounds/create/ValidationPanel";
-import CompoundVisualization from "@/components/compounds/CompoundVisualization";
+import CompoundVisualizationWrapper from "@/components/compounds/CompoundVisualizationWrapper";
 
 interface CompoundElement {
   elementId: string;
@@ -308,15 +308,16 @@ export default function CompoundDetailPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white/5 border border-white/10 rounded-xl p-6"
+              className="bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/20 rounded-2xl p-6 shadow-xl"
             >
-              <h2 className="text-xl font-bold text-white mb-4">Structure Visualization</h2>
-
               {allElements.length > 0 ? (
-                <CompoundVisualization elements={compound.elements} bonds={compound.bonds} allElements={allElements} />
+                <CompoundVisualizationWrapper elements={compound.elements} bonds={compound.bonds} allElements={allElements} />
               ) : (
-                <div className="bg-gray-900 rounded-lg p-8 text-center">
-                  <div className="text-gray-400">Loading visualization...</div>
+                <div>
+                  <h2 className="text-xl font-bold text-white mb-4">Structure Visualization</h2>
+                  <div className="bg-gray-900 rounded-lg p-8 text-center">
+                    <div className="text-gray-400">Loading visualization...</div>
+                  </div>
                 </div>
               )}
             </motion.div>

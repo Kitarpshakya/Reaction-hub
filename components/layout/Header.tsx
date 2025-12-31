@@ -15,21 +15,44 @@ export default function Header() {
   // Determine page type and header content
   const getPageInfo = () => {
     if (pathname === "/periodic-table") {
-      return { showBack: true, backUrl: "/", title: "Periodic Table" };
+      return { showBack: true, backUrl: "/", title: "Periodic Table", backLabel: "Back" };
     }
     if (pathname === "/compounds/create") {
-      return { showBack: true, backUrl: "/compounds", title: "Create Compound" };
+      return { showBack: true, backUrl: "/compounds", title: "Create Compound", backLabel: "Back" };
     }
-    if (pathname?.match(/^\/compounds\/[^/]+\/edit$/)) {
-      return { showBack: true, backUrl: "/compounds", title: "Edit Compound" };
+    // Compound Edit: Extract ID and go back to that compound's detail page
+    const compoundEditMatch = pathname?.match(/^\/compounds\/([^/]+)\/edit$/);
+    if (compoundEditMatch) {
+      const compoundId = compoundEditMatch[1];
+      return { showBack: true, backUrl: `/compounds/${compoundId}`, title: "Edit Compound", backLabel: "Cancel" };
     }
     if (pathname?.match(/^\/compounds\/[^/]+$/)) {
-      return { showBack: true, backUrl: "/compounds", title: "Compound Details" };
+      return { showBack: true, backUrl: "/compounds", title: "Compound Details", backLabel: "Back" };
     }
     if (pathname === "/compounds") {
-      return { showBack: true, backUrl: "/", title: "Chemical Compounds" };
+      return { showBack: true, backUrl: "/", title: "Chemical Compounds", backLabel: "Back" };
     }
-    return { showBack: false, backUrl: "/", title: "" };
+    if (pathname === "/organic-chemistry/create") {
+      return { showBack: true, backUrl: "/organic-chemistry", title: "Create Organic Compound", backLabel: "Back" };
+    }
+    // Organic Chemistry Edit: Extract ID and go back to that structure's detail page
+    const organicEditMatch = pathname?.match(/^\/organic-chemistry\/([^/]+)\/edit$/);
+    if (organicEditMatch) {
+      const structureId = organicEditMatch[1];
+      return {
+        showBack: true,
+        backUrl: `/organic-chemistry/${structureId}`,
+        title: "Edit Organic Compound",
+        backLabel: "Cancel",
+      };
+    }
+    if (pathname?.match(/^\/organic-chemistry\/[^/]+$/)) {
+      return { showBack: true, backUrl: "/organic-chemistry", title: "Organic Compound Details", backLabel: "Back" };
+    }
+    if (pathname === "/organic-chemistry") {
+      return { showBack: true, backUrl: "/", title: "Organic Compounds", backLabel: "Back" };
+    }
+    return { showBack: false, backUrl: "/", title: "", backLabel: "Back" };
   };
 
   const pageInfo = getPageInfo();
@@ -42,7 +65,7 @@ export default function Header() {
           <div className="flex items-center gap-4">
             {pageInfo.showBack ? (
               <>
-                {/* Back Button */}
+                {/* Back/Cancel Button */}
                 <Link
                   href={pageInfo.backUrl}
                   className="inline-flex items-center text-white/60 hover:text-white transition-colors group"
@@ -60,7 +83,7 @@ export default function Header() {
                       d="M10 19l-7-7m0 0l7-7m-7 7h18"
                     />
                   </svg>
-                  <span className="text-sm font-medium">Back</span>
+                  <span className="text-sm font-medium">{pageInfo.backLabel}</span>
                 </Link>
 
                 {/* Divider */}
@@ -88,7 +111,7 @@ export default function Header() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowDropdown(!showDropdown)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                  className="flex items-center gap-2 px-2.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-all border border-white/10 hover:border-white/20 cursor-pointer"
                 >
                   {session.user?.image && (
                     <Image
@@ -123,7 +146,7 @@ export default function Header() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute right-0 mt-2 w-64 bg-[#1A1A2E] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50"
+                        className="absolute right-0 mt-2 w-64 bg-[#1A1A2E] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 "
                       >
                         {/* User Info */}
                         <div className="px-4 py-3 border-b border-white/10 bg-white/5">
@@ -166,7 +189,7 @@ export default function Header() {
                               setShowDropdown(false);
                               signOut({ callbackUrl: "/" });
                             }}
-                            className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-3"
+                            className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-3 cursor-pointer"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path

@@ -2,11 +2,12 @@
 
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { AuthError } from "@/components/auth/AuthError";
 
-export default function LoginPage() {
+function LoginContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,8 +52,12 @@ export default function LoginPage() {
             <p className="text-white/60 text-lg">Sign in to continue</p>
           </div>
 
+          {/* Error Display */}
+          <AuthError />
+
           <div className="space-y-4">
-            {process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CONFIGURED === "true" ? (
+            {/* Google SSO Button */}
+            {process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CONFIGURED === "true" && (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -79,11 +84,33 @@ export default function LoginPage() {
                 </svg>
                 Sign in with Google
               </motion.button>
-            ) : (
+            )}
+
+            {/* Microsoft SSO Button */}
+            {process.env.NEXT_PUBLIC_MICROSOFT_OAUTH_CONFIGURED === "true" && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => signIn("azure-ad", { callbackUrl })}
+                className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-6 h-6" viewBox="0 0 23 23">
+                  <path fill="#f25022" d="M0 0h11v11H0z" />
+                  <path fill="#00a4ef" d="M12 0h11v11H12z" />
+                  <path fill="#7fba00" d="M0 12h11v11H0z" />
+                  <path fill="#ffb900" d="M12 12h11v11H12z" />
+                </svg>
+                Sign in with Microsoft
+              </motion.button>
+            )}
+
+            {/* No OAuth Configured */}
+            {process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CONFIGURED !== "true" &&
+             process.env.NEXT_PUBLIC_MICROSOFT_OAUTH_CONFIGURED !== "true" && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 text-center">
-                <p className="text-yellow-400 font-semibold mb-2">⚠️ Google OAuth Not Configured</p>
+                <p className="text-yellow-400 font-semibold mb-2">⚠️ OAuth Not Configured</p>
                 <p className="text-white/60 text-sm mb-4">
-                  To enable authentication, please configure Google OAuth credentials in your .env file
+                  To enable authentication, please configure OAuth credentials in your .env file
                 </p>
                 <Link
                   href="/"
@@ -96,12 +123,32 @@ export default function LoginPage() {
           </div>
 
           <p className="text-white/40 text-sm text-center mt-8">
-            {process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CONFIGURED === "true"
+            {(process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CONFIGURED === "true" ||
+              process.env.NEXT_PUBLIC_MICROSOFT_OAUTH_CONFIGURED === "true")
               ? "Sign in to create and manage chemical compounds"
-              : "See CLAUDE.md for setup instructions"}
+              : "See AUTH.md for setup instructions"}
           </p>
+
+          {/* School/Work Email Notice for Microsoft */}
+          {process.env.NEXT_PUBLIC_MICROSOFT_OAUTH_CONFIGURED === "true" && (
+            <p className="text-white/40 text-xs text-center mt-2">
+              Microsoft login requires school or work email
+            </p>
+          )}
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-[calc(100vh-3.5rem)] bg-linear-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#0F0F1E] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6C5CE7]"></div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

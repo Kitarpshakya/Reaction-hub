@@ -4,7 +4,8 @@ import {
   CompoundElement,
   Bond,
   ExternalFactors,
-  CanvasData
+  CanvasData,
+  MolecularGeometry
 } from "@/lib/types/compound";
 
 const CompoundElementSchema = new Schema<CompoundElement>({
@@ -15,6 +16,14 @@ const CompoundElementSchema = new Schema<CompoundElement>({
     type: {
       x: { type: Number },
       y: { type: Number },
+    },
+    required: false,
+  },
+  position3D: {
+    type: {
+      x: { type: Number },
+      y: { type: Number },
+      z: { type: Number },
     },
     required: false,
   },
@@ -90,6 +99,27 @@ const CanvasDataSchema = new Schema<CanvasData>({
   },
 });
 
+// Molecular Geometry Schema (for 3D visualization)
+const MolecularGeometrySchema = new Schema<MolecularGeometry>({
+  type: {
+    type: String,
+    enum: [
+      "linear",
+      "bent",
+      "trigonal-planar",
+      "tetrahedral",
+      "trigonal-pyramidal",
+      "trigonal-bipyramidal",
+      "octahedral",
+      "custom"
+    ],
+    required: true,
+  },
+  centralAtomId: { type: String, required: false },
+  bondAngles: { type: [Number], required: false },
+  generatedAt: { type: Date, required: false, default: Date.now },
+});
+
 const CompoundSchema = new Schema<ICompound>(
   {
     name: { type: String, required: true },
@@ -106,6 +136,7 @@ const CompoundSchema = new Schema<ICompound>(
     bonds: { type: [BondSchema], required: false },
     externalFactors: { type: ExternalFactorsSchema, required: false },
     canvasData: { type: CanvasDataSchema, required: false },
+    geometry: { type: MolecularGeometrySchema, required: false },
 
     // User info
     createdBy: { type: String, required: true },

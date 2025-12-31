@@ -18,7 +18,7 @@ export default function Home() {
         </motion.div>
 
         {/* Feature Cards */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mt-16">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto mt-16">
           {/* Periodic Table Card */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.1 }}>
             <Link href="/periodic-table" prefetch={true}>
@@ -49,6 +49,24 @@ export default function Home() {
                 <p className="text-white/50 text-sm mb-6 italic">Login required to create compounds</p>
                 <div className="inline-flex items-center text-[#F38181] font-semibold group-hover:translate-x-1 transition-transform">
                   View Compounds
+                  <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </Link>
+          </motion.div>
+
+          {/* Organic Chemistry Card */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.3 }}>
+            <Link href="/organic-chemistry" prefetch={true}>
+              <div className="group bg-linear-to-br from-[#A29BFE]/20 to-[#74B9FF]/20 border border-white/10 rounded-2xl p-8 h-full cursor-pointer hover:border-[#A29BFE]/50 transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#A29BFE]/20">
+                <div className="text-6xl mb-6">🧬</div>
+                <h2 className="text-3xl font-bold text-white mb-4">Organic Chemistry</h2>
+                <p className="text-white/70 mb-4 text-lg">Explore organic molecular structures with SMILES notation</p>
+                <p className="text-white/50 text-sm mb-6 italic">Login required to create structures</p>
+                <div className="inline-flex items-center text-[#A29BFE] font-semibold group-hover:translate-x-1 transition-transform">
+                  View Library
                   <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
